@@ -144,7 +144,7 @@ namespace AIZombiesSupreme
             //}
 
             loadConfig();
-            checkForUpdates();
+            //checkForUpdates();
 
             switch (_mapname)
             {
@@ -6119,83 +6119,5 @@ namespace AIZombiesSupreme
 
             return strings;
         }
-
-#region updating
-        private static void checkForUpdates()
-        {
-            //if (GetDvarInt("aiz_autoUpdates") == 0) return;
-            if (!autoUpdate) return;
-
-            ServicePointManager.ServerCertificateValidationCallback += (p1, p2, p3, p4) => true;//Always accept certificate validation
-
-            HttpWebRequest site = (HttpWebRequest)WebRequest.Create("https://www.dropbox.com/s/6ccupj6pw5zphne/aizombiesVersion.txt?dl=1");
-            //site.ServerCertificateValidationCallback += (sender, certificate, chain, sslPolicyErrors) => true;//Always accept certificate validation
-            site.UseDefaultCredentials = true;
-            site.Accept = "text/plain, text/html";
-            try
-            {
-                site.BeginGetResponse(new AsyncCallback((result) => recieveVersion(result, site)), null);
-            }
-            catch (Exception e)
-            {
-                Utilities.PrintToConsole(string.Format(gameStrings[91], e.Message));
-            }
-        }
-        private static void recieveVersion(IAsyncResult version, HttpWebRequest site)
-        {
-            if (!site.HaveResponse)
-            {
-                Utilities.PrintToConsole(string.Format(gameStrings[92]));
-                return;
-            }
-            HttpWebResponse response = (HttpWebResponse)site.EndGetResponse(version);
-            var encoding = Encoding.ASCII;
-            using (var reader = new StreamReader(response.GetResponseStream(), encoding))
-            {
-                string responseText = reader.ReadToEnd();
-                checkVersionNumber(responseText);
-
-                reader.Dispose();
-            }
-        }
-        private static void checkVersionNumber(string netVersion)
-        {
-            if (version != netVersion)
-            {
-                Utilities.PrintToConsole(string.Format(gameStrings[93], netVersion));
-                downloadUpdates();
-            }
-        }
-        private static void downloadUpdates()
-        {
-            string url = "https://www.dropbox.com/s/1xbeygdumv7rsgy/AIZombiesSupreme.dll?dl=1";
-
-            WebClient updater = new WebClient();
-            updater.DownloadFileCompleted += new AsyncCompletedEventHandler(downloadFinished);
-            try
-            {
-                updater.DownloadFileAsync(new Uri(url), "scripts\\AIZombiesSupreme_update.dll");
-            }
-            catch (Exception e)
-            {
-                Utilities.PrintToConsole(string.Format(gameStrings[94], e.Message));
-            }
-        }
-        private static void downloadFinished(object sender, AsyncCompletedEventArgs e)
-        {
-            try
-            {
-                if (File.Exists("scripts\\AIZombiesSupreme.dll")) File.Delete("scripts\\AIZombiesSupreme.dll");
-                File.Move("scripts\\AIZombiesSupreme_update.dll", "scripts\\AIZombiesSupreme.dll");
-            }
-            catch (Exception)
-            {
-                Utilities.PrintToConsole(gameStrings[95]);
-                if (File.Exists("scripts\\AIZombies_update.dll")) File.Delete("scripts\\AIZombies_update.dll");
-                return;
-            }
-            Utilities.PrintToConsole(gameStrings[96]);
-        }
-#endregion
     }
 }
