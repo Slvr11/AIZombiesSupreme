@@ -81,7 +81,7 @@ namespace AIZombiesSupreme
                         {
                             players.SetField("cash", players.GetField<int>("cash") + 1000);
                             hud.scorePopup(players, 1000);
-                            hud.scoreMessage(players, "Extra Cash!");
+                            hud.scoreMessage(players, AIZ.gameStrings[97]);
                         }
                     }
                     break;
@@ -95,7 +95,7 @@ namespace AIZombiesSupreme
                             points += 10;
                             players.SetField("points", points);
                             //e_hud.scorePopup(players, 10);
-                            hud.scoreMessage(players, "Extra Bonus Points!");
+                            hud.scoreMessage(players, AIZ.gameStrings[98]);
                             HudElem pointNumber = players.GetField<HudElem>("hud_pointNumber");
                             pointNumber.SetValue(points);
                         }
@@ -220,39 +220,41 @@ namespace AIZombiesSupreme
 
             AfterDelay(20000, () => StartAsync(startBonusFlash(bonus)));
 
-            OnInterval(100, () =>
+            OnInterval(100, () => checkForPowerupCollection(bonus));
+            OnInterval(4000, () => rotatePowerup(bonus));
+        }
+        private static bool rotatePowerup(Entity bonus)
+        {
+            if (!bonus.HasField("isPowerupDrop")) return false;
+            //if (!Utilities.isEntDefined(bonus)) return false;
+            bonus.RotateYaw(360, 4);
+            return true;
+        }
+        private static bool checkForPowerupCollection(Entity bonus)
+        {
+            if (!bonus.HasField("isPowerupDrop")) return false;
+            //if (!Utilities.isEntDefined(bonus)) return false;
+            foreach (Entity players in Players)
             {
-                if (!bonus.HasField("isPowerupDrop")) return false;
-                //if (!Utilities.isEntDefined(bonus)) return false;
-                foreach (Entity players in Players)
+                if (!players.IsAlive || players.Origin.DistanceTo(bonus.Origin) > 65 || players.SessionTeam != "allies") continue;
+                if ((players.GetField<bool>("isDown") || AIZ.isWeaponDeathMachine(players.CurrentWeapon)) && bonus.GetField<string>("type") == "gun") continue;
+
+                activateBonusDrop(players, bonus);
+                if (bonus.HasField("attachedFX"))
                 {
-                    if (!players.IsAlive || players.Origin.DistanceTo(bonus.Origin) > 65 || players.SessionTeam != "allies") continue;
-                    if ((players.GetField<bool>("isDown") || AIZ.isWeaponDeathMachine(players.CurrentWeapon)) && bonus.GetField<string>("type") == "gun") continue;
-                    activateBonusDrop(players, bonus);
-                    if (bonus.HasField("attachedFX"))
-                    {
-                        Entity fx = bonus.GetField<Entity>("attachedFX");
-                        //fx.Notify("death");
-                        fx.Delete();
-                        bonus.ClearField("attachedFX");
-                    }
-                    bonus.ClearField("isPowerupDrop");
-                    if (bonus.GetField<string>("type") != "nuke" && bonus.GetField<string>("type") != "freeze")
-                    {
-                        PlayFX(AIZ.fx_powerupCollect, bonus.Origin, Vector3.Zero, Vector3.Zero);
-                        bonus.Delete();
-                    }
-                    return false;
+                    Entity fx = bonus.GetField<Entity>("attachedFX");
+                    fx.Delete();
+                    bonus.ClearField("attachedFX");
                 }
-                return true;
-            });
-            OnInterval(4000, () =>
-            {
-                if (!bonus.HasField("isPowerupDrop")) return false;
-                //if (!Utilities.isEntDefined(bonus)) return false;
-                bonus.RotateYaw(360, 4);
-                return true;
-            });
+                bonus.ClearField("isPowerupDrop");
+                if (bonus.GetField<string>("type") != "nuke" && bonus.GetField<string>("type") != "freeze")
+                {
+                    PlayFX(AIZ.fx_powerupCollect, bonus.Origin, Vector3.Zero, Vector3.Zero);
+                    bonus.Delete();
+                }
+                return false;
+            }
+            return true;
         }
         private static IEnumerator startBonusFlash(Entity bonus)
         {
@@ -282,7 +284,7 @@ namespace AIZombiesSupreme
             else return false;
         }
 
-        private static IEnumerator doNuke(Entity bonus)
+        public static IEnumerator doNuke(Entity bonus)
         {
             PhysicsExplosionSphere(bonus.Origin, 5000000, 5000000, 10);
             Entity fx = SpawnFX(AIZ.fx_nuke, bonus.Origin);
@@ -307,7 +309,7 @@ namespace AIZombiesSupreme
                     players.SetField("cash", players.GetField<int>("cash") + 400);
                     hud.scorePopup(players, 400);
                 }
-                hud.scoreMessage(players, "Nuke!");
+                hud.scoreMessage(players, AIZ.gameStrings[208]);
             }
 
             //Testing
@@ -326,10 +328,10 @@ namespace AIZombiesSupreme
             yield return Wait(17);
             botUtil.freezerActivated = false;
         }
-        public static void giveRandomPerk(Entity player, int perk = -1)
+        public static IEnumerator giveRandomPerk(Entity player, int perk = -1)
         {
             bool[] ownedPerks = AIZ.getOwnedPerks(player);
-            if (!ownedPerks.Contains(false)) return;//Owns all perks, give up on life...
+            if (!ownedPerks.Contains(false)) yield break;//Owns all perks, give up on life...
 
             if (perk == -1)
             {
@@ -342,11 +344,11 @@ namespace AIZombiesSupreme
                 //re-roll
                 int randomPerk = AIZ.rng.Next(7);
                 randomPerk++;
-                giveRandomPerk(player, randomPerk);
-                return;
+                StartAsync(giveRandomPerk(player, randomPerk));
+                yield break;
             }
 
-            hud.scoreMessage(player, "Random Perk!");
+            hud.scoreMessage(player, AIZ.gameStrings[99]);
 
             switch (perk)
             {
@@ -406,11 +408,11 @@ namespace AIZombiesSupreme
             perkIcon.ScaleOverTime(1, 30, 30);
 
             player.PlayLocalSound("earn_perk");
-            AfterDelay(1000, () =>
-            {
-                perkIcon.Destroy();
-                hud.updatePerksHud(player, false, true);
-            });
+
+            yield return Wait(1);
+
+            perkIcon.Destroy();
+            hud.updatePerksHud(player, false, true);
         }
         public static void giveAllPerks(Entity player)
         {
@@ -499,7 +501,7 @@ namespace AIZombiesSupreme
                 int perk = AIZ.rng.Next(7);
                 perk++;
                 //Log.Write(LogLevel.All, "Giving perk {0}", perk);
-                giveRandomPerk(player, perk);
+                StartAsync(giveRandomPerk(player, perk));
             }
         }
     }

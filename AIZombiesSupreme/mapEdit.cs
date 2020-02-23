@@ -48,7 +48,7 @@ namespace AIZombiesSupreme
                 //pathfinding.nodes.Add(point);
                 //pathfinding.pathNode wp = new pathfinding.pathNode(point);
             }
-            if (waypoints.Count > 0) bakeWaypoints();
+            if (waypoints.Count > 0) AfterDelay(100, bakeWaypoints);
         }
 
         private static void bakeWaypoints()
@@ -62,6 +62,7 @@ namespace AIZombiesSupreme
                 {
                     if (p == wp) continue;//No unneccesary trace
                     if (p.Origin.DistanceTo(wp.Origin) > 1500) continue;//Don't trace for too far away points
+
                     bool trace = SightTracePassed(wp.Origin + new Vector3(0, 0, 5), p.Origin + new Vector3(0, 0, 5), false);
                     if (trace)
                         bakes.Add(p);
@@ -76,13 +77,14 @@ namespace AIZombiesSupreme
                 {
                     waypoints.Remove(p);
                     p.Delete();
-                    AIZ.printToConsole("A waypoint had no visible links! Deleting waypoint...");
+                    AIZ.printToConsole(AIZ.gameStrings[237]);
                 }
             }
             badPoints.Clear();
 
             //Set current wps to never change
-            foreach (Entity wp in waypoints) wp.WillNeverChange();
+            foreach (Entity wp in waypoints)
+                wp.WillNeverChange();
         }
 
         private static void executeUsable(string type, Entity player, Entity ent)
@@ -156,23 +158,26 @@ namespace AIZombiesSupreme
                     setExpAmmo(ent, player);
                     break;
                 case "heliExtraction":
-                    boardHeli(ent, player);
+                    heliSniper_boardHeli(ent, player);
                     break;
                 case "wallweapon":
                     usedWallWeapon(ent, player);
                     break;
                 //case "helmet":
-                //useHelmet(player);
-                //break;
+                    //useHelmet(player);
+                    //break;
 
                 case "dome_eeDog":
                     dome_checkEasterEggTrigger1(ent, player);
                     break;
                 case "dome_eeBunkerCabinet":
-                    dome_checkEasterEggStep4_A(ent, player);
+                    dome_checkEasterEggStep4_A(ent);
                     break;
                 case "dome_eeDomeCabinet":
-                    dome_checkEasterEggStep4_B(ent, player);
+                    dome_checkEasterEggStep4_B(ent);
+                    break;
+                case "giftTrigger":
+                    givePlayerCash(player, ent.GetField<Entity>("owner"));
                     break;
                 default:
                     break;
@@ -269,6 +274,9 @@ namespace AIZombiesSupreme
             {
                 if (!usable.HasField("range")) continue;
 
+                if (usable.GetField<string>("usabletype") == "giftTrigger")
+                    if (usable.GetField<Entity>("owner") == player) continue;
+
                 if (player.Origin.DistanceTo(usable.Origin) < usable.GetField<int>("range"))
                 {
                     displayUsableHintMessage(player, usable);
@@ -287,23 +295,24 @@ namespace AIZombiesSupreme
             message.Alpha = .85f;
             message.SetText(getUsableText(usable, player));
             //player.SetField("hud_message", message);
-            OnInterval(250, () =>
+            OnInterval(250, () => watchPlayerLeaveUsable(player, usable, message));
+        }
+        private static bool watchPlayerLeaveUsable(Entity player, Entity usable, HudElem message)
+        {
+            if (AIZ.gameEnded) return false;
+            if (!AIZ.isPlayer(player) || !player.IsAlive) return false;
+            message.SetText(getUsableText(usable, player));
+            if (player.Origin.DistanceTo(usable.Origin) > usable.GetField<int>("range"))
             {
-                if (AIZ.gameEnded) return false;
-                if (!AIZ.isPlayer(player) || !player.IsAlive) return false;
-                message.SetText(getUsableText(usable, player));
-                if (player.Origin.DistanceTo(usable.Origin) > usable.GetField<int>("range"))
-                {
-                    message.Alpha = 0;
-                    message.SetText("");
-                    //message.Destroy();
-                    player.SetField("hasMessageUp", false);
-                    //player.ClearField("hud_message");
-                    if (player.IsAlive) trackUsablesForPlayer(player);
-                    return false;
-                }
-                else return true;
-            });
+                message.Alpha = 0;
+                message.SetText("");
+                //message.Destroy();
+                player.SetField("hasMessageUp", false);
+                //player.ClearField("hud_message");
+                if (player.IsAlive) trackUsablesForPlayer(player);
+                return false;
+            }
+            else return true;
         }
 
         public static void checkPlayerUsables(Entity player)
@@ -314,9 +323,22 @@ namespace AIZombiesSupreme
                 {
                     if (usable.HasField("range") && player.Origin.DistanceTo(usable.Origin) < usable.GetField<int>("range"))
                     {
+                        if (usable.GetField<string>("usabletype") == "giftTrigger") continue;
+
                         //Log.Write(LogLevel.All, "Usable {0} found", usable.GetField<string>("usabletype"));
                         executeUsable(usable.GetField<string>("usabletype"), player, usable);
-                        break;//We found a usable close enough, get out of this loop
+                        return;//We found a usable close enough, get out of this loop
+                    }
+                }
+                if (Entity.Level.HasField("allowGifting"))
+                {
+                    foreach (Entity giftTrigger in usables.FindAll((u) => u.GetField<string>("usabletype") == "giftTrigger"))
+                    {
+                        if (giftTrigger.GetField<string>("usabletype") == "giftTrigger")
+                            if (giftTrigger.GetField<Entity>("owner") == player) continue;
+
+                        executeUsable(giftTrigger.GetField<string>("usabletype"), player, giftTrigger);
+                        return;
                     }
                 }
             }
@@ -335,72 +357,79 @@ namespace AIZombiesSupreme
             //progressBar.SetPoint("center", "center", 0, -61);
             progressBar.SetField("isScaling", false);
             reviveTrigger.SetField("user", reviver);
-            int reviveCounter = 1;
-            OnInterval(50, () =>
+            reviveTrigger.SetField("reviveCounter", 1);
+            OnInterval(50, () => revivePlayer_logicLoop(reviver, reviveTrigger, progressBar));
+        }
+        private static bool revivePlayer_logicLoop(Entity reviver, Entity reviveTrigger, HudElem progressBar)
+        {
+            if (AIZ.gameEnded) return false;
+            if (reviver.UseButtonPressed() && reviveTrigger.GetField<Entity>("player").IsAlive && reviver.Origin.DistanceTo(reviveTrigger.Origin) < 75 && !reviver.GetField<bool>("isDown"))
             {
-                if (AIZ.gameEnded) return false;
-                if (reviver.UseButtonPressed() && reviveTrigger.GetField<Entity>("player").IsAlive && reviver.Origin.DistanceTo(reviveTrigger.Origin) < 75 && !reviver.GetField<bool>("isDown"))
+                int reviveCounter = reviveTrigger.GetField<int>("reviveCounter");
+                reviver.DisableWeapons();
+                reviveCounter++;
+                if (reviver.GetField<bool>("autoRevive")) reviveCounter++;//Double time
+                reviveTrigger.SetField("reviveCounter", reviveCounter);
+
+                if (!(bool)progressBar.GetField("isScaling"))
                 {
-                    reviver.DisableWeapons();
-                    reviveCounter++;
-                    if (reviver.GetField<bool>("autoRevive")) reviveCounter++;//Double time
-                    //reviveTrigger.SetField("isBeingUsed", true);
-                    if (!(bool)progressBar.GetField("isScaling"))
-                    {
-                        progressBar.SetField("isScaling", true);
-                        if (reviver.GetField<bool>("autoRevive")) hud.updateBar(progressBar, 120, 2.5f);
-                        else hud.updateBar(progressBar, 120, 5);
-                    }
-                    if (reviveCounter >= 100)
-                    {
-                        Entity downedPlayer = reviveTrigger.GetField<Entity>("player");
-                        downedPlayer.LastStandRevive();
-                        reviver.EnableWeapons();
-                        downedPlayer.SetField("isDown", false);
-                        if (!AIZ.isHellMap || (AIZ.isHellMap && killstreaks.visionRestored)) downedPlayer.VisionSetNakedForPlayer(AIZ.vision);
-                        else downedPlayer.VisionSetNakedForPlayer(AIZ.hellVision);
-                        downedPlayer.SetCardDisplaySlot(reviver, 5);
-                        downedPlayer.ShowHudSplash("revived", 1);//copied? splashes are screwed up now
-                        downedPlayer.EnableWeaponSwitch();
-                        downedPlayer.EnableOffhandWeapons();
-                        List<string> weaponList = downedPlayer.GetField<List<string>>("weaponsList");
-                        if (!weaponList.Contains("iw5_usp45_mp"))
-                            downedPlayer.TakeWeapon("iw5_usp45_mp");
-                        downedPlayer.Health = downedPlayer.MaxHealth;
-                        reviveTrigger.GetField<HudElem>("icon").Destroy();
-                        //downedPlayer.HeadIcon = "";
-                        //downedPlayer.HeadIconTeam = "axis";
-                        progressBar.GetField("bar").As<HudElem>().Destroy();
-                        progressBar.Destroy();
-                        int amount = downedPlayer.Score / 30;
-                        amount -= amount % 10;//Remove the difference
-                        hud.scoreMessage(reviver, "Revived " + downedPlayer.Name + "!");
-                        reviver.SetField("cash", reviver.GetField<int>("cash") + amount);
-                        hud.scorePopup(reviver, amount);
-                        reviver.Assists++;
-                        //downedPlayer.SessionTeam = "allies";
-                        removeUsable(reviveTrigger);
-                        return false;
-                    }
-                    return true;
+                    progressBar.SetField("isScaling", true);
+                    if (reviver.GetField<bool>("autoRevive")) hud.updateBar(progressBar, 120, 2.5f);
+                    else hud.updateBar(progressBar, 120, 5);
                 }
-                else
+                if (reviveCounter >= 100)
                 {
-                    //reviveTrigger.SetField("isBeingUsed", false);
                     Entity downedPlayer = reviveTrigger.GetField<Entity>("player");
-                    reviveTrigger.SetField("user", reviveTrigger);
+                    downedPlayer.LastStandRevive();
+                    reviver.EnableWeapons();
+                    downedPlayer.SetField("isDown", false);
+                    if (!AIZ.isHellMap || (AIZ.isHellMap && killstreaks.visionRestored)) downedPlayer.VisionSetNakedForPlayer(AIZ.vision);
+                    else downedPlayer.VisionSetNakedForPlayer(AIZ.hellVision);
+                    downedPlayer.SetCardDisplaySlot(reviver, 5);
+                    downedPlayer.ShowHudSplash("revived", 1);
+                    downedPlayer.EnableWeaponSwitch();
+                    downedPlayer.EnableOffhandWeapons();
+                    List<string> weaponList = downedPlayer.GetField<List<string>>("weaponsList");
+                    if (!weaponList.Contains("iw5_usp45_mp"))
+                    {
+                        downedPlayer.TakeWeapon("iw5_usp45_mp");
+                        downedPlayer.SwitchToWeapon(downedPlayer.GetField<string>("lastDroppableWeapon"));
+                    }
+                    //StartAsync(AIZ.restoreWeaponIfEmptyHanded(downedPlayer));
+
+                    downedPlayer.Health = downedPlayer.MaxHealth;
+                    reviveTrigger.GetField<HudElem>("icon").Destroy();
+                    //downedPlayer.HeadIcon = "";
+                    //downedPlayer.HeadIconTeam = "axis";
                     progressBar.GetField("bar").As<HudElem>().Destroy();
                     progressBar.Destroy();
-                    reviveCounter = 1;
-                    reviver.EnableWeapons();
-                    if (!downedPlayer.IsAlive)
-                    {
-                        removeUsable(reviveTrigger);
-                        return false;
-                    }
-                    else return false;
+                    int amount = downedPlayer.Score / 30;
+                    amount -= amount % 10;//Remove the difference
+                    hud.scoreMessage(reviver, "Revived " + downedPlayer.Name + "!");
+                    reviver.SetField("cash", reviver.GetField<int>("cash") + amount);
+                    hud.scorePopup(reviver, amount);
+                    reviver.Assists++;
+                    reviveTrigger.ClearField("reviveCounter");
+                    removeUsable(reviveTrigger);
+                    return false;
                 }
-            });
+                return true;
+            }
+            else
+            {
+                Entity downedPlayer = reviveTrigger.GetField<Entity>("player");
+                reviveTrigger.SetField("user", reviveTrigger);
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                reviveTrigger.SetField("reviveCounter", 1);
+                reviver.EnableWeapons();
+                if (!downedPlayer.IsAlive)
+                {
+                    removeUsable(reviveTrigger);
+                    return false;
+                }
+                else return false;
+            }
         }
 
         private static void grabCarePackage(Entity package, Entity player)
@@ -413,175 +442,192 @@ namespace AIZombiesSupreme
             progressBar.SetField("isScaling", false);
 
             //package.SetField("user", player);
-            //package.SetField("percent", 0);
-            int percent = 0;
+            player.SetField("percent", 0);
 
-            int streak = package.GetField<int>("streak");
+            OnInterval(50, () => grabCarePackage_logicLoop(player, package, progressBar));
+        }
+        private static bool grabCarePackage_logicLoop(Entity player, Entity package, HudElem progressBar)
+        {
+            if (AIZ.gameEnded) return false;
+            if (!AIZ.isPlayer(player)) return false;
 
-            OnInterval(50, () =>
+            if (player.UseButtonPressed() && player.Origin.DistanceTo(package.Origin) < 75)
             {
-                if (AIZ.gameEnded) return false;
-                if (!AIZ.isPlayer(player)) return false;
+                int percent = player.GetField<int>("percent");
 
-                //Entity trigger = package.GetField<Entity>("trigger");
-                if (player.UseButtonPressed() && player.Origin.DistanceTo(package.Origin) < 75)
-                {
-                    player.DisableWeapons();
-                    Entity owner = package.GetField<Entity>("owner");
-                    if (owner == player)
-                    {
-                        percent += 10;
-                        //crate.SetField("percent", crate.GetField<int>("percent") + 5);
-                        //isOwner = true;
-                    }
-                    else
-                        percent++;
-                    //crate.SetField("percent", crate.GetField<int>("percent") + 2);
-                    //if (owner == p) 
-                    //_hud._hud.updateBar(progressBar, grabCounter/100, (1000 / 100) * 100);
-                    //else _hud._hud.updateBar(progressBar, grabCounter, (1000 / 3000) * 1);
-                    //progressBar.SetShader("white", grabCounter, 10);
-                    //if (isOwner) progressBar.Call("scaleovertime", 1, 100, 10);
-                    if (!(bool)progressBar.GetField("isScaling") && owner == player)
-                    {
-                        progressBar.SetField("isScaling", true);
-                        //progressBar.ScaleOverTime(1, 100, 10);
-                        hud.updateBar(progressBar, 120, .5f);
-                    }
-                    else if (!(bool)progressBar.GetField("isScaling") && owner != player)
-                    {
-                        progressBar.SetField("isScaling", true);
-                        //progressBar.ScaleOverTime(2.5f, 100, 10);
-                        hud.updateBar(progressBar, 120, 5f);
-                    }
-                    if (percent >= 100)
-                    {
-                        //captured = true;
-                        player.EnableWeapons();
-                        //progressBar.Parent.Destroy();
-                        progressBar.Destroy();
-                        progressBar.GetField("bar").As<HudElem>().Destroy();
-                        if (player != owner && AIZ.isPlayer(owner))
-                        {
-                            owner.SetField("cash", owner.GetField<int>("cash") + 100);
-                            hud.scorePopup(owner, 100);
-                            hud.scoreMessage(owner, "Shared Care Package!");
-                        }
-                        PlayFX(AIZ.fx_crateCollectSmoke, package.Origin);
-                        PlaySoundAtPos(package.Origin, "crate_impact");
-                        removeUsable(package);
-                        killstreaks.giveKillstreak(player, streak);
-                        return false;
-                    }
-                    return true;
-                }
+                player.DisableWeapons();
+                Entity owner = package.GetField<Entity>("owner");
+
+                if (owner == player)
+                    percent += 10;
                 else
+                    percent++;
+                player.SetField("percent", percent);
+
+                if (!(bool)progressBar.GetField("isScaling") && owner == player)
                 {
+                    progressBar.SetField("isScaling", true);
+                    //progressBar.ScaleOverTime(1, 100, 10);
+                    hud.updateBar(progressBar, 120, .5f);
+                }
+                else if (!(bool)progressBar.GetField("isScaling") && owner != player)
+                {
+                    progressBar.SetField("isScaling", true);
+                    //progressBar.ScaleOverTime(2.5f, 100, 10);
+                    hud.updateBar(progressBar, 120, 5f);
+                }
+                if (percent >= 100)
+                {
+                    player.EnableWeapons();
                     progressBar.GetField("bar").As<HudElem>().Destroy();
                     progressBar.Destroy();
-                    //package.SetField("percent", 0);
-                    //package.SetField("user", package);
-                    player.EnableWeapons();
+                    if (player != owner && AIZ.isPlayer(owner))
+                    {
+                        owner.SetField("cash", owner.GetField<int>("cash") + 100);
+                        hud.scorePopup(owner, 100);
+                        hud.scoreMessage(owner, "Shared Care Package!");
+                    }
+                    PlayFX(AIZ.fx_crateCollectSmoke, package.Origin);
+                    PlaySoundAtPos(package.Origin, "crate_impact");
+                    player.ClearField("percent");
+                    removeUsable(package);
+                    killstreaks.giveKillstreak(player, package.GetField<int>("streak"));
                     return false;
                 }
-            });
+                return true;
+            }
+            else
+            {
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                player.ClearField("percent");
+                player.EnableWeapons();
+                return false;
+            }
         }
 
         private static void setExpAmmo(Entity box, Entity player)
         {
+            if (!player.HasField("isDown")) return;
             if (player.GetField<bool>("hasExpAmmoPerk")) return;
             if (player.GetField<bool>("isCarryingSentry")) return;
             if (player.SessionTeam != "allies") return;
-            int grabCounter = 0;
-            //bool isOwner = false;
+
             HudElem progressBar = hud.createPrimaryProgressBar(player, 0, 0);
-            //progressBar.SetPoint("center", "center", 0, -61);
             progressBar.SetField("isScaling", false);
-            OnInterval(50, () =>
+
+            player.SetField("percent", 0);
+
+            OnInterval(50, () => setExpAmmo_logicLoop(box, player, progressBar));
+        }
+        private static bool setExpAmmo_logicLoop(Entity box, Entity player, HudElem progressBar)
+        {
+            if (AIZ.gameEnded) return false;
+            if (player.UseButtonPressed() && player.Origin.DistanceTo(box.Origin) < 75)
             {
-                if (AIZ.gameEnded) return false;
-                if (player.UseButtonPressed() && player.Origin.DistanceTo(box.Origin) < 75)
+                int grabCounter = player.GetField<int>("percent");
+
+                player.DisableWeapons();
+                grabCounter += 2;
+                player.SetField("percent", grabCounter);
+
+                if (!(bool)progressBar.GetField("isScaling"))
                 {
-                    player.DisableWeapons();
-                    grabCounter += 2;
-                    if (!(bool)progressBar.GetField("isScaling"))
-                    {
-                        progressBar.SetField("isScaling", true);
-                        hud.updateBar(progressBar, 120, 2.5f);
-                    }
-                    if (grabCounter >= 100)
-                    {
-                        progressBar.GetField("bar").As<HudElem>().Destroy();
-                        progressBar.Destroy();
-                        player.SetPerk("specialty_explosivebullets", true, true);
-                        player.SetField("hasExpAmmoPerk", true);
-
-                        List<string> weaponsList = player.GetField<List<string>>("weaponsList");
-                        foreach (string weapon in weaponsList)
-                        {
-                            string type = WeaponType(weapon);
-                            if (type == "projectile" || type == "grenade") continue;
-
-                            player.SetWeaponAmmoClip(weapon, 0);
-                            player.GiveMaxAmmo(weapon);
-                        }
-
-                        player.EnableWeapons();
-                        Entity owner = box.GetField<Entity>("owner");
-                        if (player != owner)
-                        {
-                            owner.SetField("cash", owner.GetField<int>("cash") + 50);
-                            hud.scorePopup(owner, 50);
-                            hud.scoreMessage(owner, "Explosive Ammo Shared!");
-                        }
-                        return false;
-                    }
-                    return true;
+                    progressBar.SetField("isScaling", true);
+                    hud.updateBar(progressBar, 120, 2.5f);
                 }
-                else
+                if (grabCounter >= 100)
                 {
                     progressBar.GetField("bar").As<HudElem>().Destroy();
                     progressBar.Destroy();
-                    grabCounter = 0;
+                    player.SetPerk("specialty_explosivebullets", true, true);
+                    player.SetField("hasExpAmmoPerk", true);
+                    player.ClearField("percent");
+
+                    List<string> weaponsList = player.GetField<List<string>>("weaponsList");
+                    foreach (string weapon in weaponsList)
+                    {
+                        string type = WeaponType(weapon);
+                        if (type == "projectile" || type == "grenade") continue;
+
+                        player.SetWeaponAmmoClip(weapon, 0);
+                        player.GiveMaxAmmo(weapon);
+                    }
+
                     player.EnableWeapons();
+                    Entity owner = box.GetField<Entity>("owner");
+                    if (player != owner)
+                    {
+                        owner.SetField("cash", owner.GetField<int>("cash") + 50);
+                        hud.scorePopup(owner, 50);
+                        hud.scoreMessage(owner, "Explosive Ammo Shared!");
+                    }
                     return false;
                 }
-            });
-            if (player.GetField<bool>("hasExpAmmoPerk")) return;
+                return true;
+            }
+            else
+            {
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                player.ClearField("percent");
+                player.EnableWeapons();
+                return false;
+            }
         }
 
-        private static void boardHeli(Entity node, Entity player)
+        private static void heliSniper_boardHeli(Entity node, Entity player)
         {
             if (player.GetField<bool>("isCarryingSentry")) return;
             if (player.SessionTeam != "allies") return;
             if (AIZ.isWeaponDeathMachine(player.CurrentWeapon)) return;
-            int grabCounter = 1;
-            Entity lb = node.GetField<Entity>("heli");
-            if (player != lb.GetField<Entity>("owner") || player.GetField<bool>("isDown")) return;
-            OnInterval(50, () =>
+            if (player != node.GetField<Entity>("heli").GetField<Entity>("owner") || player.GetField<bool>("isDown")) return;
+
+            node.SetField("percent", 0);
+            OnInterval(50, () => heliSniper_boardHeli_holdLogicLoop(player, node));
+        }
+        private static bool heliSniper_boardHeli_holdLogicLoop(Entity player, Entity node)
+        {
+            if (AIZ.gameEnded) return false;
+            if (player.UseButtonPressed() && player.Origin.DistanceTo(node.Origin) < 75)
             {
-                if (AIZ.gameEnded) return false;
-                if (player.UseButtonPressed() && player.Origin.DistanceTo(node.Origin) < 75)
+                node.SetField("percent", node.GetField<int>("percent") + 1);
+                if (node.GetField<int>("percent") >= 5)
                 {
-                    grabCounter++;
-                    if (grabCounter >= 5)
-                    {
-                        //lb.Notify("playerBoarded", player);
-                        StartAsync(killstreaks.doHeliBoard(lb, player));
-                        if (node.HasField("icon")) node.GetField<HudElem>("icon").Destroy();
-                        removeUsable(node);
-                        return false;
-                    }
-                    return true;
-                }
-                else
-                {
-                    //grabCounter = 1;
+                    StartAsync(killstreaks.heliSniper_doBoarding(node.GetField<Entity>("heli"), player));
+                    if (node.HasField("icon")) node.GetField<HudElem>("icon").Destroy();
+                    node.ClearField("percent");
+                    removeUsable(node);
                     return false;
                 }
-            });
+                return true;
+            }
+            else
+            {
+                //grabCounter = 1;
+                return false;
+            }
         }
 
+        private static void givePlayerCash(Entity sender, Entity recipient)
+        {
+            if (!recipient.HasField("isDown")) return;
+            if (!IsPlayer(recipient)) return;
+            if (sender == recipient) return;
+            if (!recipient.IsAlive || !sender.IsAlive) return;
+            if (sender.GetField<int>("cash") < 500) return;
+
+            sender.SetField("cash", sender.GetField<int>("cash") - 500);
+            hud.scorePopup(sender, -500);
+            string icon = hud.createHudShaderString("cardicon_girlskull", false, 64, 64);
+            string senderMessage = icon + string.Format(AIZ.gameStrings[238], recipient) + icon;
+            hud.scoreMessage(sender, senderMessage);
+
+            recipient.SetField("cash", recipient.GetField<int>("cash") + 500);
+            hud.scorePopup(recipient, 500);
+            string recipientMessage = icon + string.Format(AIZ.gameStrings[239], sender) + icon;
+            hud.scoreMessage(recipient, recipientMessage);
+        }
         #endregion
 
         #region stucture creators
@@ -619,19 +665,23 @@ namespace AIZombiesSupreme
             weapon.HidePart("tag_knife");
             crate.SetField("weaponEnt", weapon);
 
-            OnInterval(3000, () =>
-            {
-                if (crate.GetField<string>("state") == "idle")
-                {
-                    weapon.RotateYaw(360, 3);
-                    return true;
-                }
-                else if (!AIZ.gameEnded) return true;
-                else return false;
-            });
+            OnInterval(3000, () => rotateWeaponCrateWeapon(weapon, crate));
 
             makeUsable(crate, "randombox", 75);
+
+            if (Entity.Level.HasField("isXmas"))
+                AIZ.spawnXmasLightsOnUsable(crate);
             //return crate;
+        }
+        private static bool rotateWeaponCrateWeapon(Entity weapon, Entity crate)
+        {
+            if (crate.GetField<string>("state") == "idle")
+            {
+                weapon.RotateYaw(360, 3);
+                return true;
+            }
+            else if (!AIZ.gameEnded) return true;
+            else return false;
         }
 
         private static void papCrate(Vector3 origin, Vector3 angles)
@@ -688,11 +738,7 @@ namespace AIZombiesSupreme
             laptop.Angles = new Vector3(0, 90, 0);
             laptop.SetModel("com_laptop_2_open");
             crate.SetField("laptop", laptop);
-            OnInterval(4000, () =>
-            {
-                laptop.RotateYaw(360, 4);
-                return true;
-            });
+            OnInterval(4000, () => rotateEntity(laptop));
             int curObjID = 31 - getNextObjID();
             Objective_Add(curObjID, "active", crate.Origin, "cardicon_8ball"); // objective_add
             //Call(435, curObjID, new Parameter(crate.Origin)); // objective_position
@@ -797,12 +843,7 @@ namespace AIZombiesSupreme
             ammoRotater.SetModel("tag_origin");
             ammoBox.EnableLinkTo();
             ammoBox.LinkTo(ammoRotater, "tag_origin", new Vector3(7, -4, 0), Vector3.Zero);
-            OnInterval(4000, () =>
-            {
-                if (AIZ.gameEnded) return false;
-                ammoRotater.RotateYaw(360, 4);
-                return true;
-            });
+            OnInterval(4000, () => rotateEntity(ammoRotater));
 
             crate.SetField("used", false);
             makeUsable(crate, "ammo", 75);
@@ -831,15 +872,17 @@ namespace AIZombiesSupreme
             Entity remote = Spawn("script_model", origin + new Vector3(0, 0, 20));
             remote.Angles = Vector3.Zero;
             remote.SetModel("viewmodel_uav_radio");
-            OnInterval(4000, () =>
-            {
-                if (AIZ.gameEnded) return false;
-                remote.RotateYaw(360, 4);
-                return true;
-            });
+            OnInterval(4000, () => rotateEntity(remote));
 
             makeUsable(crate, "killstreak", 75);
             //return crate;
+        }
+
+        private static bool rotateEntity(Entity ent)
+        {
+            if (AIZ.gameEnded) return false;
+            ent.RotateYaw(360, 4);
+            return true;
         }
 
         private static void powerCrate(Vector3 origin, Vector3 angles)
@@ -866,24 +909,26 @@ namespace AIZombiesSupreme
 
             Entity fx = SpawnFX(AIZ.fx_glow, crate.Origin + new Vector3(0, 0, 20));
             Entity fx2 = SpawnFX(AIZ.fx_glow2, crate.Origin + new Vector3(0, 0, 30));
-            OnInterval(100, () =>
-            {
-                TriggerFX(fx);
-                TriggerFX(fx2);
-                if (fx.HasField("delete"))
-                {
-                    fx.ClearField("delete");
-                    fx.Delete();
-                    fx2.Delete();
-                    return false;
-                }
-                return true;
-            });
+            OnInterval(100, () => runPowerCrateFX(fx, fx2));
 
             crate.SetField("fx", fx);
             crate.SetField("bought", false);
             makeUsable(crate, "power", 75);
             //return crate;
+        }
+
+        private static bool runPowerCrateFX(Entity fx, Entity fx2)
+        {
+            TriggerFX(fx);
+            TriggerFX(fx2);
+            if (fx.HasField("delete"))
+            {
+                fx.ClearField("delete");
+                fx.Delete();
+                fx2.Delete();
+                return false;
+            }
+            return true;
         }
 
         private static Entity wallWeapon(Vector3 origin, Vector3 angles, string weapon, int price)
@@ -934,6 +979,12 @@ namespace AIZombiesSupreme
                     if (AIZ.isPlayer(player)) player.PlayLocalSound("nuke_wave");
                 }
 
+                Entity[] fx = crate.GetField<Entity[]>("fx_xmas");
+                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin");
+
                 yield return Wait(2.8f);
 
                 Entity rockCrumble = SpawnFX(AIZ.fx_rock, rebar.Origin);
@@ -951,6 +1002,11 @@ namespace AIZombiesSupreme
                 rebar.MoveTo(rebar.Origin - new Vector3(0, 0, 50), 4, 0.5f, 1);
 
                 yield return Wait(1);
+
+                AfterDelay(200, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin"));
+                AfterDelay(400, () => PlayFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin"));
+                AfterDelay(600, () => PlayFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin"));
+                AfterDelay(800, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin"));
 
                 Vector3 dropImpulse = new Vector3(300, 50, -60);
                 crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
@@ -1037,36 +1093,33 @@ namespace AIZombiesSupreme
                 //crate.EnableLinkTo();
                 //crate.LinkTo(center);
                 crate.WillNeverChange();
-                if (death) setDeathWall(crate);
+                if (death) OnInterval(200, () => setDeathWall(crate));
                 for (int i = 0; i < blocks; i++)
                 {
                     crate = spawnCrate(start + (new Vector3(A.X, A.Y, 0) * i) + new Vector3(0, 0, 15) + (new Vector3(0, 0, A.Z) * h), angle, invisible, death);
                     //crate.EnableLinkTo();
                     //crate.LinkTo(center);
                     crate.WillNeverChange();
-                    if (death) setDeathWall(crate);
+                    if (death) OnInterval(200, () => setDeathWall(crate));
                 }
                 crate = spawnCrate(new Vector3(end.X, end.Y, start.Z) + new Vector3(TXA * -1, TYA * -1, 15) + (new Vector3(0, 0, A.Z) * h), angle, invisible, death);
                 //crate.EnableLinkTo();
                 //crate.LinkTo(center);
                 crate.WillNeverChange();
-                if (death) setDeathWall(crate);
+                if (death) OnInterval(200, () => setDeathWall(crate));
             }
             //return center;
         }
 
-        private static void setDeathWall(Entity crate)
+        private static bool setDeathWall(Entity crate)
         {
-            OnInterval(200, () =>
+            if (AIZ.gameEnded) return false;
+            foreach (Entity player in Players)
             {
-                if (AIZ.gameEnded) return false;
-                foreach (Entity player in Players)
-                {
-                    if (player.IsAlive && player.Origin.DistanceTo(crate.Origin) < 60)
-                        player.Suicide();
-                }
-                return true;
-            });
+                if (player.IsAlive && player.Origin.DistanceTo(crate.Origin) < 60)
+                    player.Suicide();
+            }
+            return true;
         }
 
         private static void createFloor(Vector3 corner1, Vector3 corner2, bool invisible, bool death)
@@ -1105,17 +1158,19 @@ namespace AIZombiesSupreme
             //trigger.Code_Classname = "trigger_teleport";
             //trigger.SetField("endPos", exit);
 
-            OnInterval(200, () =>
+            OnInterval(200, () => watchElevator(enter, exit));
+        }
+
+        private static bool watchElevator(Vector3 enter, Vector3 exit)
+        {
+            foreach (Entity player in Players)
             {
-                foreach (Entity player in Players)
+                if (player.IsAlive && player.Origin.DistanceTo(enter) <= 50)
                 {
-                    if (player.IsAlive && player.Origin.DistanceTo(enter) <= 50)
-                    {
-                        player.SetOrigin(exit);
-                    }
+                    player.SetOrigin(exit);
                 }
-                return true;
-            });
+            }
+            return true;
         }
 
         private static void realElevator(Vector3 start, Vector3 angle, Vector3 end, Vector3 drop)
@@ -1236,7 +1291,7 @@ namespace AIZombiesSupreme
             }
         }
 
-        private static Entity spawnCrate(Vector3 origin, Vector3 angles, bool Invisible, bool Death)
+        public static Entity spawnCrate(Vector3 origin, Vector3 angles, bool Invisible, bool Death)
         {
             Entity ent = Spawn("script_model", origin);
             if (!Invisible && !Death) ent.SetModel("com_plasticcase_friendly");
@@ -1250,60 +1305,55 @@ namespace AIZombiesSupreme
             return ent;
         }
 
-        private static void monitorFallDeath(int height)
+        private static bool monitorFallDeath(int height)
         {
-            OnInterval(200, () =>
+            if (AIZ.gameEnded) return false;
+            foreach (Entity player in Players)
             {
-                if (AIZ.gameEnded) return false;
-                foreach (Entity player in Players)
+                if (player.IsAlive)
                 {
-                    if (player.IsAlive)
-                    {
-                        if (player.Origin.Z < height)
-                            player.Suicide();
-                    }
+                    if (player.Origin.Z < height)
+                        player.Suicide();
                 }
-                return true;
-            });
+            }
+            return true;
         }
 
         private static void setupSpaceLimit(bool isX, float min, float max)
         {
-            //Either interval or Tick
             if (isX)
-            {
-                OnInterval(200, () =>
-                {
-                    foreach (Entity player in Players)
-                    {
-                        if (player.IsAlive)
-                        {
-                            Vector3 origin = player.Origin;
-                            if (origin.X < min) player.SetOrigin(new Vector3(min + 10, origin.Y, origin.Z));
-                            else if (origin.X > max) player.SetOrigin(new Vector3(max - 10, origin.Y, origin.Z));
-                        }
-                    }
-                    if (!AIZ.gameEnded) return true;
-                    else return false;
-                });
-            }
+                OnInterval(200, () => watchSpaceLimit_xAxis(min, max));
             else
-            {
-                OnInterval(200, () =>
+                OnInterval(200, () => watchSpaceLimit_yAxis(min, max));
+        }
+
+        private static bool watchSpaceLimit_xAxis(float min, float max)
+        {
+                foreach (Entity player in Players)
                 {
-                    foreach (Entity player in Players)
+                    if (player.IsAlive)
                     {
-                        if (player.IsAlive)
-                        {
-                            Vector3 origin = player.Origin;
-                            if (origin.Y < min) player.SetOrigin(new Vector3(origin.X, min + 10, origin.Z));
-                            else if (origin.Y > max) player.SetOrigin(new Vector3(origin.X, max - 10, origin.Z));
-                        }
+                        Vector3 origin = player.Origin;
+                        if (origin.X < min) player.SetOrigin(new Vector3(min + 10, origin.Y, origin.Z));
+                        else if (origin.X > max) player.SetOrigin(new Vector3(max - 10, origin.Y, origin.Z));
                     }
-                    if (!AIZ.gameEnded) return true;
-                    else return false;
-                });
+                }
+                if (!AIZ.gameEnded) return true;
+                else return false;
+        }
+        private static bool watchSpaceLimit_yAxis(float min, float max)
+        {
+            foreach (Entity player in Players)
+            {
+                if (player.IsAlive)
+                {
+                    Vector3 origin = player.Origin;
+                    if (origin.Y < min) player.SetOrigin(new Vector3(origin.X, min + 10, origin.Z));
+                    else if (origin.Y > max) player.SetOrigin(new Vector3(origin.X, max - 10, origin.Z));
+                }
             }
+            if (!AIZ.gameEnded) return true;
+            else return false;
         }
 
         private static void spawnBank(Vector3 origin, Vector3 angles)
@@ -1382,12 +1432,12 @@ namespace AIZombiesSupreme
 
             if (player.GetField<int>("cash") < 10 && sale)
             {
-                player.IPrintLn("^1Not enough money for a Random Weapon. Need ^2$10");
+                player.IPrintLn(AIZ.gameStrings[240]);
                 yield break;
             }
             else if (player.GetField<int>("cash") < 950 && !sale)
             {
-                player.IPrintLn("^1Not enough money for a Random Weapon. Need ^2$950");
+                player.IPrintLn(AIZ.gameStrings[241]);
                 yield break;
             }
 
@@ -1403,7 +1453,7 @@ namespace AIZombiesSupreme
                     player.SetField("cash", player.GetField<int>("cash") - 950);
                     hud.scorePopup(player, -950);
                 }
-                hud.scoreMessage(player, "Random Weapon!");
+                hud.scoreMessage(player, AIZ.gameStrings[242]);
             }
             box.SetField("state", "inuse");
             player.PlayLocalSound("achieve_bomb");
@@ -1495,6 +1545,12 @@ namespace AIZombiesSupreme
             bear.SetModel(teddyModel);
             box.SetField("isRotating", true);
 
+            if (box.HasField("fx_xmas"))
+            {
+                Array.ForEach(box.GetField<Entity[]>("fx_xmas"), (fx) => fx.Delete());
+                box.ClearField("fx_xmas");
+            }
+
             yield return Wait(3);
 
             PlayFX(AIZ.fx_disappear, bear.Origin);
@@ -1575,7 +1631,7 @@ namespace AIZombiesSupreme
             {
                 player.SetField("cash", player.GetField<int>("cash") - 5000);
                 hud.scorePopup(player, -5000);
-                hud.scoreMessage(player, "Weapon Upgraded!");
+                hud.scoreMessage(player, AIZ.gameStrings[243]);
             }
             box.SetField("state", "inuse");
             box.SetField("player", player);
@@ -1759,7 +1815,7 @@ namespace AIZombiesSupreme
             yield return Wait(10.5f);
 
             if (weapon.Model == "tag_origin") yield break;
-            if (box.GetField<string>("state") != "idle" && box.GetField<string>("weapon") == upgradeWeapon)
+            if (box.GetField<string>("state") != "idle" && box.GetField<string>("weapon") == upgradeWeapon && box.GetField<Entity>("player") == player)
             {
                 if (!box.GetField<bool>("destroyed"))
                 {
@@ -1783,23 +1839,23 @@ namespace AIZombiesSupreme
             if (player.SessionTeam != "allies") return;
             if (player.GetField<bool>("GamblerInUse") && !player.GetField<bool>("GamblerReady"))
             {
-                player.IPrintLn("^1Gambler is already in use!");
+                player.IPrintLn(AIZ.gameStrings[244]);
                 return;
             }
             if (!player.GetField<bool>("GamblerReady") && !player.GetField<bool>("GamblerInUse"))
             {
-                player.IPrintLnBold("^1You may only use the gambler once per round!");
+                player.IPrintLnBold(AIZ.gameStrings[245]);
                 return;
             }
             if (player.GetField<int>("cash") >= 1000)
             {
                 player.SetField("cash", player.GetField<int>("cash") - 1000);
                 hud.scorePopup(player, -1000);
-                hud.scoreMessage(player, "Gambler!");
+                hud.scoreMessage(player, AIZ.gameStrings[246]);
                 player.SetField("GamblerInUse", true);
                 player.SetField("GamblerReady", false);
                 //level.Notify("use_gambler");
-                player.IPrintLnBold("^2Your results will display in 10 seconds.");
+                player.IPrintLnBold(AIZ.gameStrings[248]);
                 StartAsync(gamblerCountdown(player));
                 Entity laptop = box.GetField<Entity>("laptop");
                 laptop.MoveTo(box.Origin + new Vector3(0, 0, 38), 4);
@@ -1818,14 +1874,14 @@ namespace AIZombiesSupreme
                     player.GiveWeapon("defaultweapon_mp");
                     AIZ.updatePlayerWeaponsList(player, "defaultweapon_mp");
                     StartAsync(AIZ.switchToWeapon_delay(player, "defaultweapon_mp", .1f));
-                    player.IPrintLnBold("^2You've won an extra weapon slot.");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "an extra weapon slot"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 1:
                     //500 points
                     player.SetField("cash", player.GetField<int>("cash") + 500);
                     hud.scorePopup(player, 500);
-                    player.IPrintLnBold("^2You've won 500 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "500 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1833,7 +1889,7 @@ namespace AIZombiesSupreme
                     //1000 points
                     player.SetField("cash", player.GetField<int>("cash") + 1000);
                     hud.scorePopup(player, 1000);
-                    player.IPrintLnBold("^2You've won 1000 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "1000 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1841,7 +1897,7 @@ namespace AIZombiesSupreme
                     //1500 points
                     player.SetField("cash", player.GetField<int>("cash") + 1500);
                     hud.scorePopup(player, 1500);
-                    player.IPrintLnBold("^2You've won 1500 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "1500 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1849,7 +1905,7 @@ namespace AIZombiesSupreme
                     //2000 points
                     player.SetField("cash", player.GetField<int>("cash") + 2000);
                     hud.scorePopup(player, 2000);
-                    player.IPrintLnBold("^2You've won 2000 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "2000 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1857,7 +1913,7 @@ namespace AIZombiesSupreme
                     //5000 points
                     player.SetField("cash", player.GetField<int>("cash") + 5000);
                     hud.scorePopup(player, 5000);
-                    player.IPrintLnBold("^2You've won 5000 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "5000 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1865,7 +1921,7 @@ namespace AIZombiesSupreme
                     //7500 points
                     player.SetField("cash", player.GetField<int>("cash") + 7500);
                     hud.scorePopup(player, 7500);
-                    player.IPrintLnBold("^2You've won 7500 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "7500 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1873,7 +1929,7 @@ namespace AIZombiesSupreme
                     //10000 points
                     player.SetField("cash", player.GetField<int>("cash") + 10000);
                     hud.scorePopup(player, 10000);
-                    player.IPrintLnBold("^2You've won 10000 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "10000 points"));
                     player.SetField("GamblerInUse", false);
                     player.PlayFX(AIZ.fx_money, player.Origin);
                     break;
@@ -1883,7 +1939,7 @@ namespace AIZombiesSupreme
                     if (player.GetField<int>("cash") < 0)
                         player.SetField("cash", 0);
                     hud.scorePopup(player, -500);
-                    player.IPrintLnBold("^1You've lost 500 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "500 points"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 9:
@@ -1950,7 +2006,7 @@ namespace AIZombiesSupreme
                         hud.updatePerksHud(player, true);
                         player.SetField("totalPerkCount", 0);
                     }
-                    player.IPrintLnBold("^1You've lost all of your perks!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "all of your perks"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 10:
@@ -2022,24 +2078,24 @@ namespace AIZombiesSupreme
                         hud.updatePerksHud(player, true);
                         player.SetField("totalPerkCount", 0);
                     }
-                    player.IPrintLnBold("^1You've lost all of your perks and 200 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "all of your perks and 200 points"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 11:
                     //double health
-                    player.IPrintLnBold("^2Double Health for 30 seconds!");
-                    StartAsync(AIZ.setTempHealth(player, player.Health * 2, 30, "Double Health over!"));
+                    player.IPrintLnBold(AIZ.gameStrings[251]);
+                    StartAsync(AIZ.setTempHealth(player, player.Health * 2, 30, AIZ.gameStrings[252]));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 12:
                     //inf health
-                    player.IPrintLnBold("^2Infinite Health for 30 seconds!");
-                    StartAsync(AIZ.setTempHealth(player, 999999999, 30, "Infinite Health over!"));
+                    player.IPrintLnBold(AIZ.gameStrings[253]);
+                    StartAsync(AIZ.setTempHealth(player, 999999999, 30, AIZ.gameStrings[254]));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 13:
                     //model1887
-                    player.IPrintLnBold("^2You've won a Model 1887!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "a Model 1887"));
 
                     if (AIZ.isThunderGun(player.CurrentWeapon))
                         AIZ.currentThunderguns--;
@@ -2054,16 +2110,16 @@ namespace AIZombiesSupreme
                     break;
                 case 14:
                     //max ammo
-                    player.IPrintLnBold("^2You have 1/2 chance for Max Ammo!");
+                    player.IPrintLnBold(AIZ.gameStrings[255]);
                     int roll = AIZ.rng.Next(2);
 
                     if (roll == 0)
                     {
                         AfterDelay(1500, () => AIZ.giveMaxAmmo(player));
-                        AfterDelay(1500, () => player.IPrintLnBold("^2You've won the Max Ammo!"));
+                        AfterDelay(1500, () => player.IPrintLnBold(AIZ.gameStrings[256]));
                     }
                     else
-                        AfterDelay(1500, () => player.IPrintLnBold("^1No Max Ammo."));
+                        AfterDelay(1500, () => player.IPrintLnBold(AIZ.gameStrings[257]));
 
                     player.SetField("GamblerInUse", false);
                     break;
@@ -2073,7 +2129,7 @@ namespace AIZombiesSupreme
                     if (player.GetField<int>("cash") < 0)
                         player.SetField("cash", 0);
                     hud.scorePopup(player, -1000);
-                    player.IPrintLnBold("^1You've lost 1000 points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "1000 points"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 16:
@@ -2081,26 +2137,26 @@ namespace AIZombiesSupreme
                     int cash = -player.GetField<int>("cash");
                     player.SetField("cash", 0);
                     hud.scorePopup(player, cash);
-                    player.IPrintLnBold("^1You've lost all of your points!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "all of your points"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 17:
                     //live or die
-                    player.IPrintLnBold("^1God decides if you live or die in 5 seconds");
+                    player.IPrintLnBold(AIZ.gameStrings[258]);
                     StartAsync(gambler_determineDeath(player));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 18:
-                    player.IPrintLnBold("^1You've won nothing.");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[247], "nothing"));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 19:
-                    player.IPrintLnBold("^2You've won an extra free perk!");
-                    bonusDrops.giveRandomPerk(player);
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "an extra free perk"));
+                    StartAsync(bonusDrops.giveRandomPerk(player));
                     player.SetField("GamblerInUse", false);
                     break;
                 case 20:
-                    player.IPrintLnBold("^1You've lost your current weapon!");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[250], "your current weapon"));
                     if (AIZ.mayDropWeapon(player.CurrentWeapon) && player.GetField<List<string>>("weaponsList").Count > 1)
                     {
                         AIZ.updatePlayerWeaponsList(player, player.CurrentWeapon, true);
@@ -2114,13 +2170,13 @@ namespace AIZombiesSupreme
                     player.SetField("GamblerInUse", false);
                     break;
                 case 21:
-                    player.IPrintLnBold("^2You've won a random killstreak!");
-                    int randomStreak = AIZ.rng.Next(1, 11);
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "a random killstreak"));
+                    int randomStreak = AIZ.rng.Next(1, 12);
                     killstreaks.giveKillstreak(player, randomStreak);
                     player.SetField("GamblerInUse", false);
                     break;
                 default:
-                    player.IPrintLnBold("^1You've won nothing.");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[247], "nothing"));
                     player.SetField("GamblerInUse", false);
                     break;
             }
@@ -2144,7 +2200,7 @@ namespace AIZombiesSupreme
                     AfterDelay(0, () => player.Suicide());
                     break;
                 default:
-                    player.IPrintLnBold("^2You live.");
+                    player.IPrintLnBold(AIZ.gameStrings[259]);
                     break;
             }
         }
@@ -2180,7 +2236,7 @@ namespace AIZombiesSupreme
             int cost = 4500 + player.GetField<int>("ammoCostAddition");
             if (player.GetField<int>("cash") < cost)
             {
-                player.IPrintLn("^1Not enough money for Ammo. Need ^2$" + cost.ToString());
+                player.IPrintLn(AIZ.gameStrings[260] + cost.ToString());
                 box.SetField("used", true);
                 AfterDelay(1000, () =>
                     box.SetField("used", false));
@@ -2190,7 +2246,7 @@ namespace AIZombiesSupreme
             {
                 player.SetField("cash", player.GetField<int>("cash") - cost);
                 hud.scorePopup(player, -cost);
-                hud.scoreMessage(player, "Ammo!");
+                hud.scoreMessage(player, AIZ.gameStrings[261]);
                 player.SetField("ammoCostAddition", player.GetField<int>("ammoCostAddition") * 2);
                 if (player.GetField<int>("ammoCostAddition") == 0) player.SetField("ammoCostAddition", 500);
                 box.SetField("used", true);
@@ -2211,11 +2267,11 @@ namespace AIZombiesSupreme
             {
                 player.SetField("points", player.GetField<int>("points") - 200);
                 hud.scorePopup(player, -200);
-                hud.scoreMessage(player, "Random Killstreak!");
+                hud.scoreMessage(player, AIZ.gameStrings[262]);
                 HudElem pointNumber = player.GetField<HudElem>("hud_pointNumber");
                 int points = player.GetField<int>("points");
                 pointNumber.SetValue(points);
-                int randomKS = AIZ.rng.Next(1, 11);
+                int randomKS = AIZ.rng.Next(1, 12);
                 killstreaks.giveKillstreak(player, randomKS);
             }
         }
@@ -2232,15 +2288,15 @@ namespace AIZombiesSupreme
                 //Log.Write(LogLevel.All, "tmpBalance: {0}", totalBalance);
                 player.SetField("cash", player.GetField<int>("cash") - 1000);
                 hud.scorePopup(player, -1000);
-                hud.scoreMessage(player, "Bank Deposit");
+                hud.scoreMessage(player, AIZ.gameStrings[227]);
                 player.SetPlayerData("money", totalBalance);
-                player.IPrintLnBold("Current Balance: $" + totalBalance.ToString());
+                player.IPrintLnBold(string.Format(AIZ.gameStrings[263], totalBalance));
             }
             else
             {
                 if ((int)player.GetPlayerData("money") < 1000)
                 {
-                    player.IPrintLnBold("Current Balance: $0");
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[263], 0));
                     return;
                 }
                 int totalBalance = (int)player.GetPlayerData("money");
@@ -2248,9 +2304,9 @@ namespace AIZombiesSupreme
                 //Log.Write(LogLevel.All, "tmpBalance: {0}", totalBalance);
                 player.SetField("cash", player.GetField<int>("cash") + 900);
                 hud.scorePopup(player, 900);
-                hud.scoreMessage(player, "Bank Withdraw");
+                hud.scoreMessage(player, AIZ.gameStrings[264]);
                 player.SetPlayerData("money", totalBalance);
-                player.IPrintLnBold("Current Balance: $" + totalBalance.ToString());
+                player.IPrintLnBold(string.Format(AIZ.gameStrings[263], totalBalance));
             }
         }
 
@@ -2352,8 +2408,24 @@ namespace AIZombiesSupreme
             if (player.GetField<bool>("isDown") || !AIZ.powerActivated || !player.IsAlive || player.GetField<int>("cash") < 500 || elevator.GetField<bool>("isMoving")) return;
             player.SetField("cash", player.GetField<int>("cash") - 500);
             hud.scorePopup(player, -500);
-            hud.scoreMessage(player, "Elevator!");
+            hud.scoreMessage(player, AIZ.gameStrings[265]);
             elevator.SetField("isMoving", true);
+
+            if (elevator.HasField("fx_xmas"))
+            {
+                Entity[] fx = elevator.GetField<Entity[]>("fx_xmas");
+
+                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin");
+                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin");
+
+                AfterDelay(100, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin"));
+                AfterDelay(200, () => PlayFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin"));
+                AfterDelay(300, () => PlayFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin"));
+                AfterDelay(400, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin"));
+            }
+
             Vector3 start = elevator.GetField<Vector3>("startPos");
             Vector3 end = elevator.GetField<Vector3>("endPos");
             Vector3 drop = elevator.GetField<Vector3>("dropPos");
@@ -2389,40 +2461,40 @@ namespace AIZombiesSupreme
             switch (perk)
             {
                 case 1:
-                    name = "Juggernog";
+                    name = AIZ.gameStrings[266];
                     perks = new string[] { "specialty_armorvest" };
                     icon = "cardicon_juggernaut_1";
                     break;
                 case 2:
-                    name = "Stamin-Up";
+                    name = AIZ.gameStrings[267];
                     perks = new string[] { "specialty_lightweight", "specialty_longersprint" };//"specialty_marathon"
                     icon = "specialty_longersprint_upgrade";
                     break;
                 case 3:
-                    name = "Speed Cola";
+                    name = AIZ.gameStrings[268];
                     perks = new string[] { "specialty_fastreload", "specialty_quickdraw" };//, "specialty_quickswap"
                     icon = "specialty_fastreload_upgrade";
                     break;
                 case 4:
-                    name = "Mule Kick";
+                    name = AIZ.gameStrings[269];
                     icon = "specialty_twoprimaries_upgrade";
                     break;
                 case 5:
-                    name = "Double Tap";
+                    name = AIZ.gameStrings[270];
                     perks = new string[] { "specialty_rof" };
                     icon = "weapon_attachment_rof";
                     break;
                 case 6:
-                    name = "Stalker Soda";
+                    name = AIZ.gameStrings[271];
                     perks = new string[] { "specialty_stalker" };
                     icon = "specialty_stalker_upgrade";
                     break;
                 case 7:
-                    name = "Quick Revive Pro";
+                    name = AIZ.gameStrings[272];
                     icon = "waypoint_revive";
                     break;
                 case 8:
-                    name = "Scavenge-Aid";
+                    name = AIZ.gameStrings[273];
                     perks = new string[] { "specialty_scavenger" };
                     icon = "specialty_scavenger_upgrade";
                     break;
@@ -2459,11 +2531,16 @@ namespace AIZombiesSupreme
             if (box.GetField<bool>("bought")) return;
             player.SetField("cash", player.GetField<int>("cash") - 10000);
             hud.scorePopup(player, -10000);
-            hud.scoreMessage(player, "Power!");
+            hud.scoreMessage(player, AIZ.gameStrings[274]);
             box.SetField("bought", true);
             box.CloneBrushModelToScriptModel(player);
             box.MoveTo(box.Origin + new Vector3(0, 0, 2000), 5);
             box.GetField<Entity>("fx").SetField("delete", true);
+            if (box.HasField("fx_xmas"))
+            {
+                Array.ForEach(box.GetField<Entity[]>("fx_xmas"), (fx) => fx.Delete());
+                box.ClearField("fx_xmas");
+            }
             hud.EMPTime = 0;
             //int objID = _objIDs[box];
             //Objective_Delete(objID);
@@ -2482,7 +2559,7 @@ namespace AIZombiesSupreme
             if (hud.powerHud != null)
             {
                 hud.powerHud.Color = new Vector3(0, 0.9f, 0);
-                hud.powerHud.SetText("Power has been activated");
+                hud.powerHud.SetText(AIZ.gameStrings[275]);
             }
             StartAsync(hud.powerBoughtHud(player));
         }
@@ -2498,7 +2575,7 @@ namespace AIZombiesSupreme
                 door.SetField("state", "open");
                 player.SetField("cash", player.GetField<int>("cash") - cost);
                 hud.scorePopup(player, -cost);
-                hud.scoreMessage(player, "Opened Door!");
+                hud.scoreMessage(player, AIZ.gameStrings[276]);
                 door.MoveTo(door.GetField<Vector3>("open"), 1);
                 if (door.HasField("spawn"))
                 {
@@ -2548,170 +2625,180 @@ namespace AIZombiesSupreme
             if (player.SessionTeam != "allies") return string.Empty;
             switch (usable.GetField<string>("usabletype"))
             {
+                case "giftTrigger":
+                    if (player == usable.GetField<Entity>("owner")) return "";
+                    if (!usable.GetField<Entity>("owner").IsAlive || usable.GetField<Entity>("owner").GetField<bool>("isDown") || !AIZ.isPlayer(usable.GetField<Entity>("owner"))) return "";
+                    return AIZ.gameStrings[277] + usable.GetField<Entity>("owner").Name;
                 case "door":
                     if (usable.GetField<string>("state") == "close")
-                        return "Hold ^3[{+activate}] ^7to open the door [Cost: " + usable.GetField<int>("cost").ToString() + "]";
+                        return string.Format(AIZ.gameStrings[278], usable.GetField<int>("cost"), "[{+activate}]");
                     else return "";
                 case "randombox":
                     if (usable.GetField<string>("state").Equals("inuse") || usable.GetField<string>("state") == "post_pickup") return "";
                     if (usable.GetField<string>("state").Equals("waiting"))
                     {
                         if (usable.GetField<Entity>("player") == player)
-                            return "Press ^3[{+activate}] ^7to trade Weapons: " + localizedNames[usable.GetField<int>("weapon")];
+                            return AIZ.gameStrings[279] + localizedNames[usable.GetField<int>("weapon")];
                         return "";
                     }
-                    if (sale) return "Press ^3[{+activate}] ^7for a Random Weapon [Cost: 10]";
-                    else return "Press ^3[{+activate}] ^7for a Random Weapon [Cost: 950]";
+                    if (sale) return AIZ.gameStrings[280];
+                    else return AIZ.gameStrings[281];
                 case "pap":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
                     if (usable.GetField<string>("state").Equals("inuse")) return "";
                     if (usable.GetField<string>("state").Equals("waiting"))
                     {
                         if (usable.GetField<Entity>("player") == player)
-                            return "Press ^3[{+activate}] ^7to take ^2your new upgraded weapon";
+                            return AIZ.gameStrings[283];
                         return "";
                     }
-                    return "Press ^3[{+activate}] ^7to upgrade your ^1Current Weapon ^7[Cost: 5000]";
+                    return AIZ.gameStrings[284];
                 case "gambler":
-                    if (!player.GetField<bool>("GamblerInUse")) return "Press ^3[{+activate}] ^7to use the Gambler [Cost: 1000]";
+                    if (!player.GetField<bool>("GamblerInUse")) return AIZ.gameStrings[285];
                     else return "";
                 case "killstreak":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    else return "Hold ^3[{+activate}] ^7to buy a random killstreak [Cost: 200 ^5Bonus Points^7]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    else return AIZ.gameStrings[286];
                 case "teleporter":
-                    if (usable.GetField<int>("state") > 0) return "The teleporter is cooling down.";
-                    else if (!usable.GetField<bool>("isLinked")) return "^1You must link the teleporter first!";
-                    else return "Hold ^3[{+activate}] ^7to teleport";
+                    if (usable.GetField<int>("state") > 0) return AIZ.gameStrings[287];
+                    else if (!usable.GetField<bool>("isLinked")) return AIZ.gameStrings[288];
+                    else return AIZ.gameStrings[289];
                 case "linker":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    else if (usable.GetField<Entity>("teleporter").GetField<int>("state") > 0) return "The teleporter is cooling down.";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    else if (usable.GetField<Entity>("teleporter").GetField<int>("state") > 0) return AIZ.gameStrings[287];
                     else if (usable.GetField<Entity>("teleporter").GetField<bool>("isLinked")) return "";
-                    else return "Hold ^3[{+activate}] ^7to link the teleporter";
+                    else return AIZ.gameStrings[290];
                 case "elevator":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
                     else if (usable.GetField<bool>("isMoving")) return "";
-                    else return "Hold ^3[{+activate}] ^7to use the elevator [Cost: 500]";
+                    else return AIZ.gameStrings[291];
                 case "bank":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    else return "Press ^3[{+activate}] ^7to withdraw from the ATM [Amount: 1000] [Cost: 100]\n\n                  Press ^3[{vote yes}] ^7to deposit to the ATM [Cost: 1000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    else return AIZ.gameStrings[292];
                 case "perk1":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk1bought")) return "You already have Juggernog!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Juggernog [Cost: 2500]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk1bought")) return string.Format(AIZ.gameStrings[293], "Juggernog");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Juggernog", 2500, "[{+activate}]");
                 case "perk2":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk2bought")) return "You already have Stamin-Up!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Stamin-Up [Cost: 2000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk2bought")) return string.Format(AIZ.gameStrings[293], "Stamin-Up");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Stamin-Up", 2000, "[{+activate}]");
                 case "perk3":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk3bought")) return "You already have Speed Cola!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Speed Cola [Cost: 3000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk3bought")) return string.Format(AIZ.gameStrings[293], "Speed Cola");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Speed Cola", 3000, "[{+activate}]");
                 case "perk4":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk4bought")) return "You already have Mule Kick!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Mule Kick [Cost: 4000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk4bought")) return string.Format(AIZ.gameStrings[293], "Mule Kick");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Mule Kick", 4000, "[{+activate}]");
                 case "perk5":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk5bought")) return "You already have Double Tap!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Double Tap [Cost: 2000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk5bought")) return string.Format(AIZ.gameStrings[293], "Double Tap");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Double Tap", 2000, "[{+activate}]");
                 case "perk6":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk6bought")) return "You already have Stalker Soda!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Stalker Soda [Cost: 1500]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk6bought")) return string.Format(AIZ.gameStrings[293], "Stalker Soda");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Stalker Soda", 1500, "[{+activate}]");
                 case "perk7":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("autoRevive")) return "You already have Quick Revive Pro!";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("autoRevive")) return string.Format(AIZ.gameStrings[293], "Quick Revive Pro");
                     else if (player.GetField<int>("perk7bought") >= 3) return "You already bought Quick Revive Pro three times!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Quick Revive Pro [Cost: 1500]";
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Quick Revive Pro", 1500, "[{+activate}]");
                 case "perk8":
-                    if (!AIZ.powerActivated) return "^1Power must be activated!";
-                    if (player.GetField<bool>("perk8bought")) return "You already have Scavenge-Aid!";
-                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return "You may only carry " + AIZ.perkLimit.ToString() + " perks!";
-                    else return "Hold ^3[{+activate}] ^7to buy Scavenge-Aid [Cost: 4000]";
+                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (player.GetField<bool>("perk8bought")) return string.Format(AIZ.gameStrings[293], "Scavenge-Aid");
+                    if (player.GetField<int>("totalPerkCount") >= AIZ.perkLimit && AIZ.perkLimit > 0) return string.Format(AIZ.gameStrings[295], AIZ.perkLimit);
+                    else return string.Format(AIZ.gameStrings[294], "Scavenge-Aid", 4000, "[{+activate}]");
                 case "ammo":
                     if (usable.GetField<bool>("used")) return "";
-                    else return "Hold ^3[{+activate}] ^7to buy Ammo [Cost: " + (4500 + player.GetField<int>("ammoCostAddition")).ToString() + "]";
+                    else return string.Format(AIZ.gameStrings[294], AIZ.gameStrings[301], (4500 + player.GetField<int>("ammoCostAddition")), "[{+activate}]");
                 case "power":
-                    return "Press ^3[{+activate}] ^7to activate Power [Cost: 10000]";
+                    return AIZ.gameStrings[296];
                 case "expAmmo":
                     if (player.GetField<bool>("hasExpAmmoPerk")) return "";
-                    else return "Hold ^3[{+activate}] ^7for Explosive Ammo";
+                    else return AIZ.gameStrings[297];
                 case "heliExtraction":
                     Entity lb = usable.GetField<Entity>("heli");
                     Entity owner = lb.GetField<Entity>("owner");
                     if (player != owner) return "";
-                    else return "Hold ^3[{+activate}] ^7to board the Heli";
+                    else return AIZ.gameStrings[298];
                 case "revive":
                     Entity downed = usable.GetField<Entity>("player");
                     if (player == downed || usable.GetField<Entity>("user") == player) return "";
-                    else if (usable.GetField<Entity>("user") != usable) return downed.Name + " is already being revived!";
-                    else return "Hold ^3[{+activate}] ^7to revive " + downed.Name;
+                    else if (usable.GetField<Entity>("user") != usable) return downed.Name + AIZ.gameStrings[299];
+                    else return AIZ.gameStrings[300] + downed.Name;
                 case "carePackage":
                     string streak = "";
                     switch (usable.GetField<int>("streak"))
                     {
                         case 0:
-                            streak = "Ammo";
+                            streak = AIZ.gameStrings[301];
                             break;
                         case 1:
-                            streak = "Missile";
+                            streak = AIZ.gameStrings[302];
                             break;
                         case 2:
-                            streak = "Sentry Gun";
+                            streak = AIZ.gameStrings[303];
                             break;
                         case 3:
                             if (AIZ.isHellMap)
-                                streak = "Vision Restorer";
+                                streak = AIZ.gameStrings[304];
                             else
-                                streak = "Power Surge";
+                                streak = AIZ.gameStrings[305];
                             break;
                         case 4:
-                            streak = "Deployable Explosive Ammo";
+                            streak = AIZ.gameStrings[306];
                             break;
                         case 5:
-                            streak = "M.O.A.B.";
+                            streak = AIZ.gameStrings[229];
                             break;
                         case 6:
-                            streak = "Littlebird Drone";
+                            streak = AIZ.gameStrings[308];
                             break;
                         case 7:
-                            streak = "Heli Sniper";
+                            streak = AIZ.gameStrings[309];
                             break;
-                        case 11:
-                            streak = "Double Points";
+                        case 9:
+                            streak = AIZ.gameStrings[310];
                             break;
                         case 12:
-                            streak = "Insta-Kill";
+                            streak = AIZ.gameStrings[311];
                             break;
                         case 13:
-                            streak = "Nuke";
+                            streak = AIZ.gameStrings[312];
                             break;
                         case 14:
-                            streak = "Death Machine";
+                            streak = AIZ.gameStrings[313];
+                            break;
+                        case 15:
+                            streak = AIZ.gameStrings[314];
                             break;
                         case 8:
-                            streak = "Airstrike";
+                            streak = AIZ.gameStrings[315];
                             break;
                     }
-                    return "Hold ^3[{+activate}] ^7for " + streak;
+                    return AIZ.gameStrings[316] + streak;
                 case "wallweapon":
                     string weapon = usable.GetField<string>("weapon");
                     string weaponName = hud.getWeaponName(weapon);
-                    if (weaponName == "") weaponName = "Weapon";
+                    if (weaponName == "") weaponName = AIZ.gameStrings[317];
                     int cost = usable.GetField<int>("price");
 
-                    if (usable.HasField("script_noteworthy")) return "Press ^3[{+activate}] ^7to wash away your sins.";
+                    if (usable.HasField("script_noteworthy")) return AIZ.gameStrings[318];
 
-                    if (!player.HasWeapon(weapon) && cost != 0) return "Press ^3[{+activate}] ^7for " + weaponName + " ^7[Cost: " + cost.ToString() + "]";
-                    else if (!player.HasWeapon(weapon) && cost == 0) return "Press ^3[{+activate}] ^7for " + weaponName;
-                    else return "Press ^3[{+activate}] ^7for Ammo [Cost: " + (cost/2).ToString() + "]";
+                    if (!player.HasWeapon(weapon) && cost != 0) return string.Format(AIZ.gameStrings[319], weaponName, cost, "[{+activate}]");
+                    else if (!player.HasWeapon(weapon) && cost == 0) return string.Format(AIZ.gameStrings[320], weaponName);
+                    else return AIZ.gameStrings[316] + (cost/2);
+                case "helmet":
+                    if (player.HasField("helmet") && player.GetField<bool>("helmet")) return "";
+                    return AIZ.gameStrings[320] + " P.E.S.";
                 default:
                     return "";
             }
@@ -2749,7 +2836,7 @@ namespace AIZombiesSupreme
         {
             if (player.HasField("helmet")) return;
             player.PlayLocalSound("mp_killstreak_equip_done");
-            player.IPrintLnBold("Press ^3[{+actionslot 3}] ^7to equip P.E.S.");
+            player.IPrintLnBold(AIZ.gameStrings[322]);
             player.GiveWeapon("trophy_mp");
             player.SetActionSlot(3, "weapon", "trophy_mp");
             player.SetField("helmet", true);
@@ -2784,7 +2871,7 @@ namespace AIZombiesSupreme
                 
                 player.Attach("ims_scorpion_explosive1", "j_head", true);
 
-                player.IPrintLnBold("^5P.E.S. Active.");
+                player.IPrintLnBold(AIZ.gameStrings[323]);
             });
         }
         public static void takeOffHelmet(Entity player)
@@ -2882,7 +2969,7 @@ namespace AIZombiesSupreme
                 player.ClearField("isSuffocating");
                 yield break;
             }
-            player.IPrintLnBold("^5Please activate P.E.S.");
+            player.IPrintLnBold(AIZ.gameStrings[324]);
             player.PlayLocalSound("breathing_hurt");
             player.SetBlurForPlayer(.5f, .25f);
             yield return Wait(.5f);
@@ -2951,13 +3038,14 @@ namespace AIZombiesSupreme
 
             if (fx == null) return;
 
-            OnInterval(1000, () => 
-            {
-                if (!sale) { fx.Delete(); return false; }
-                //TriggerFX(fx);
-                return true;
-            });
+            OnInterval(1000, () => deleteSaleFXOnEnd(fx));
 
+        }
+
+        private static bool deleteSaleFXOnEnd(Entity fx)
+        {
+            if (!sale) { fx.Delete(); return false; }
+            return true;
         }
 
         public static void makeUsable(Entity ent, string type, int range)
@@ -3009,7 +3097,7 @@ namespace AIZombiesSupreme
             }
             catch (Exception e)
             {
-                AIZ.printToConsole("error loading mapedit for map {0}: {1}", mapname, e.Message);
+                AIZ.printToConsole(AIZ.gameStrings[325], mapname, e.Message);
             }
         }
 
@@ -3249,7 +3337,7 @@ namespace AIZombiesSupreme
                 case "fallLimit":
                     if (split.Length < 1) return;
                     int val = int.Parse(split[1]);
-                    monitorFallDeath(val);
+                    OnInterval(200, () => monitorFallDeath(val));
                     //Also set zombie death limit here
                     AIZ.mapHeight = val;
                     break;
@@ -3263,22 +3351,22 @@ namespace AIZombiesSupreme
                     if (split.Length < 1) return;
                     SetMapCenter(AIZ.parseVec3(split[0]));
                     break;
-                /*
+                    /*
             case "spacehelmet":
-                if (g_AIZ._mapname != "mp_dome") return;
+                if (AIZ._mapname != "mp_dome") return;
                 split = split[1].Split(';');
                 if (split.Length < 2) return;
-                spawnMoonHelmet(g_AIZ.parseVec3(split[0]), g_AIZ.parseVec3(split[1]));
+                spawnMoonHelmet(AIZ.parseVec3(split[0]), AIZ.parseVec3(split[1]));
                 break;
             case "excavator":
-                if (g_AIZ._mapname != "mp_dome") return;
+                if (AIZ._mapname != "mp_dome") return;
                 split = split[1].Split(';');
                 if (split.Length < 2) return;
-                spawnMoonExcavator(g_AIZ.parseVec3(split[0]), g_AIZ.parseVec3(split[1]), split[2]);
+                spawnMoonExcavator(AIZ.parseVec3(split[0]), AIZ.parseVec3(split[1]), split[2]);
                 break;
                 */
                 default:
-                    AIZ.printToConsole("Unknown MapEdit Entry {0}... ignoring", type);
+                    AIZ.printToConsole(AIZ.gameStrings[326], type);
                     break;
             }
         }
@@ -3480,6 +3568,33 @@ namespace AIZombiesSupreme
                                 ent.Delete();
                             }
                         }
+                    /*
+                    else if (AIZ.getZombieMapname() == "Burger Town")
+                    {
+                        Entity[] gates = new Entity[2];
+                        for (int i = 18; i < 1000; i++)
+                        {
+                            Entity ent = GetEntByNum(i);
+                            if (ent == null) continue;
+                            string targetname = ent.TargetName;
+                            if (targetname == null || targetname == "") continue;
+                            if (targetname == "gate_gate_closing")
+                            {
+                                if (gates[0] == null) gates[0] = ent;
+                                else
+                                {
+                                    gates[1] = ent;
+                                    break;
+                                }
+                            }
+                        }
+
+                        gates[0].Origin = new Vector3(2432, 5090, gates[1].Origin.Z);
+                        gates[0].Angles -= new Vector3(0, 90, 0);
+
+                        StartAsync(terminal_buildGates(gates));
+                    }
+                    */
                     break;
                 case "mp_italy":
                     yield return WaitForFrame();
@@ -3512,8 +3627,99 @@ namespace AIZombiesSupreme
                         createWall(new Vector3(-1507, 474, 651), new Vector3(-1510, 41, 682), true, false);
                     }
                     break;
+                case "mp_morningwood":
+                    yield return Wait(1);
+                    if (AIZ.getZombieMapname() == "Under Construction")
+                    {
+                        //Fix the TP linker location
+                        foreach (Entity usable in usables)
+                        {
+                            if (usable.GetField<string>("usabletype") == "linker")
+                            {
+                                if (usable.Origin.DistanceTo(new Vector3(-1654, 1641, 1206)) < 5)
+                                {
+                                    usable.Origin = new Vector3(-1658, 1629, 1195);
+                                    usable.Angles = new Vector3(90, 62, 0);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case "mp_shipbreaker":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Ship-REKD")
+                    {
+                        //Close up broken wall by the large crane
+                        createWall(new Vector3(97, 183, 759), new Vector3(17, 52, 934), true, false);
+                    }
+                    break;
             }
         }
+        /*
+        private static IEnumerator terminal_buildGates(Entity[] gates)
+        {
+            yield return Wait(.3f);
+
+            Entity[] intro_col = new Entity[7];
+            Entity[] intro_col2 = new Entity[7];
+            for (int i = 0; i < 7; i++)
+            {
+                Entity gatePart = Spawn("script_model", gates[1].Origin - new Vector3(0, 0, 24 * i));
+                gatePart.Angles = gates[1].Angles;
+                gatePart.CloneBrushModelToScriptModel(gates[1]);
+                gatePart.LinkTo(gates[1]);
+
+                Entity gatePart2 = Spawn("script_model", gates[0].Origin - new Vector3(0, 0, 24 * i));
+                gatePart2.Angles = gates[0].Angles;
+                gatePart2.CloneBrushModelToScriptModel(gates[0]);
+                gatePart2.LinkTo(gates[0]);
+            }
+            for (int i = 0; i < intro_col.Length; i++)
+            {
+                Entity gateCol = Spawn("script_model", gates[1].Origin - new Vector3(0, 0, 24 * i));
+                gateCol.Angles = gates[1].Angles;
+                gateCol.CloneBrushModelToScriptModel(gates[1]);
+                gateCol.Hide();
+                intro_col[i] = gateCol;
+
+                Entity gateCol2 = Spawn("script_model", gates[0].Origin - new Vector3(0, 0, 24 * i));
+                gateCol2.Angles = gates[0].Angles;
+                gateCol2.CloneBrushModelToScriptModel(gates[0]);
+                gateCol2.Hide();
+                intro_col2[i] = gateCol2;
+            }
+
+            gates[0].Origin += new Vector3(0, 0, 143);
+            gates[1].Origin += new Vector3(0, 0, 143);
+
+            StartAsync(terminal_dropTheGates(gates, intro_col, intro_col2));
+        }
+        private static IEnumerator terminal_dropTheGates(Entity[] gates, Entity[] intro_col, Entity[] intro_col2)
+        {
+            while (!AIZ.intermissionTimerStarted)
+                yield return WaitForFrame();
+
+            yield return Wait(2);
+
+            foreach (Entity gate in gates)
+            {
+                gate.MoveTo(gate.Origin - new Vector3(0, 0, 143), 2, 1.5f);
+                gate.PlayLoopSound("ugv_engine_high");
+            }
+
+            yield return Wait(2);
+
+            gates[0].StopLoopSound();
+            gates[1].StopLoopSound();
+            gates[0].PlaySound("physics_car_door_default");
+            gates[1].PlaySound("physics_car_door_default");
+
+            foreach (Entity col in intro_col)
+                col.Delete();
+            foreach (Entity col in intro_col2)
+                col.Delete();
+        }
+        */
         /*
         private static void domeEasterEgg(Entity trigger, Entity player)
         {
@@ -3543,7 +3749,7 @@ namespace AIZombiesSupreme
                     ent.Delete();
             }
         }
-        public static void dome_deleteDynamicModels()
+        public static IEnumerator dome_deleteDynamicModels()
         {
             List<Entity> newEnts = new List<Entity>();
             //List<Entity> entEdits = new List<Entity>();
@@ -3562,48 +3768,47 @@ namespace AIZombiesSupreme
                     ent.Delete();
                 }
                 //else if (entModel == "vehicle_hummer_destructible")
-                    //entEdits.Add(ent);
+                //entEdits.Add(ent);
                 //else if (entTargetName == "explodable_barrel")
-                    //entEdits.Add(ent);
+                //entEdits.Add(ent);
             }
 
-            AfterDelay(50, () =>
+            yield return WaitForFrame();
+
+            foreach (Entity ent in newEnts)
             {
-                foreach (Entity ent in newEnts)
+                string model = ent.Model;
+                if (model.StartsWith("fence_tarp_"))
                 {
-                    string model = ent.Model;
-                    if (model.StartsWith("fence_tarp_"))
-                    {
-                        ent.TargetName = "dynamic_model";
-                        if (model != "fence_tarp_134x76") ent.ScriptModelPlayAnim(model + "_med_01");
-                        else if (model == "fence_tarp_134x76") ent.ScriptModelPlayAnim(model + "_med_02");
-                    }
-                    else if (model == "machinery_windmill")
-                    {
-                        ent.TargetName = "dynamic_model";
-                        ent.ScriptModelPlayAnim("windmill_spin_med");
-                        List<Entity> dome_windmillList = Entity.Level.GetField<List<Entity>>("windmillList");
-                        dome_windmillList.Add(ent);
-                        Entity.Level.SetField("windmillList", new Parameter(dome_windmillList));
-                    }
-                    else if (model.Contains("foliage"))
-                    {
-                        ent.TargetName = "dynamic_model";
-                        ent.ScriptModelPlayAnim("foliage_desertbrush_1_sway");
-                    }
-                    else if (model.Contains("oil_pump_jack"))
-                    {
-                        ent.TargetName = "dynamic_model";
-                        ent.ScriptModelPlayAnim("oilpump_pump0" + (AIZ.rng.Next(2) + 1));
-                    }
-                    else if (model == "accessories_windsock_large")
-                    {
-                        ent.TargetName = "dynamic_model";
-                        ent.ScriptModelPlayAnim("windsock_large_wind_medium");
-                    }
-                    ent.Show();
+                    ent.TargetName = "dynamic_model";
+                    if (model != "fence_tarp_134x76") ent.ScriptModelPlayAnim(model + "_med_01");
+                    else if (model == "fence_tarp_134x76") ent.ScriptModelPlayAnim(model + "_med_02");
                 }
-            });
+                else if (model == "machinery_windmill")
+                {
+                    ent.TargetName = "dynamic_model";
+                    ent.ScriptModelPlayAnim("windmill_spin_med");
+                    List<Entity> dome_windmillList = Entity.Level.GetField<List<Entity>>("windmillList");
+                    dome_windmillList.Add(ent);
+                    Entity.Level.SetField("windmillList", new Parameter(dome_windmillList));
+                }
+                else if (model.Contains("foliage"))
+                {
+                    ent.TargetName = "dynamic_model";
+                    ent.ScriptModelPlayAnim("foliage_desertbrush_1_sway");
+                }
+                else if (model.Contains("oil_pump_jack"))
+                {
+                    ent.TargetName = "dynamic_model";
+                    ent.ScriptModelPlayAnim("oilpump_pump0" + (AIZ.rng.Next(2) + 1));
+                }
+                else if (model == "accessories_windsock_large")
+                {
+                    ent.TargetName = "dynamic_model";
+                    ent.ScriptModelPlayAnim("windsock_large_wind_medium");
+                }
+                ent.Show();
+            }
         }
         
         public static string getAlliesFlagModel(string mapname)
@@ -3719,7 +3924,7 @@ namespace AIZombiesSupreme
 
         #region dome moon
         /*
-        private static void initDomeMoon()
+        public static void initDomeMoon()
         {
             Entity bunkerZone = Entity.GetEntity(550);
             Entity bunkerEntranceZone = Entity.GetEntity(544);
@@ -3741,12 +3946,12 @@ namespace AIZombiesSupreme
             
             AfterDelay(50, () =>
             {
-                if (g_AIZ.getZombieMapname() == "Moonbase")
+                if (AIZ.getZombieMapname() == "Moonbase")
                 {
                     AmbientStop();
                     SetSunlight(new Vector3(-1, -1, 1));
                     VisionSetNaked("cobra_sunset3");
-                    g_AIZ.vision = "cobra_sunset3";
+                    AIZ.vision = "cobra_sunset3";
                     monitorMoonGravity(bunkerZone, bunkerEntranceZone, bunkerMidZone, backBuildingZone, backHallwayZone, buildingZone, domeZone);
                 }
                 //else
@@ -3757,6 +3962,17 @@ namespace AIZombiesSupreme
                 //}
                 
             });
+
+            for (int i = 0; i < 2000; i++)
+            {
+                Entity e = Entity.GetEntity(i);
+                if (e.Model == "vehicle_hummer_destructible")
+                {
+                    e.SetModel("com_satellite_dish_big");
+                    e.SetCanDamage(false);
+                    OnInterval(4000, () => rotateEntity(e));
+                }
+            }
         }
         */
         #endregion
@@ -3959,77 +4175,75 @@ namespace AIZombiesSupreme
                 }
             }
         }
-        private static void dome_checkEasterEggStep4_A(Entity t, Entity player)
+        private static void dome_checkEasterEggStep4_A(Entity t)
         {
+            if (t.GetField<bool>("hasBeenActivated")) return;
+
+            t.SetField("hasBeenActivated", true);
+            t.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2");
+            t.PlaySound("switch_auto_lights_on");
+            t.SetField("time", 0);
             Entity triggerDome = GetEnt("aiz_dome_cabinet_trigger_dome", "targetname");
 
+            OnInterval(50, () => dome_monitorEasterEggStep4_A(t, triggerDome));
+        }
+
+        private static bool dome_monitorEasterEggStep4_A(Entity trigger, Entity triggerDome)
+        {
+            if (trigger.GetField<int>("time") > 10)
+            {
+                trigger.SetField("hasBeenActivated", false);
+                trigger.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2_busted");
+                trigger.PlaySound("switch_auto_lights_off");
+                return false;
+            }
+            else if (triggerDome.GetField<bool>("hasBeenActivated"))
+            {
+                trigger.PlaySound("ims_plant");
+                removeUsable(trigger);
+                return false;
+            }
+            trigger.SetField("time", trigger.GetField<int>("time") + 1);
+            return true;
+        }
+        private static void dome_checkEasterEggStep4_B(Entity t)//Bunker
+        {
             if (t.GetField<bool>("hasBeenActivated")) return;
 
             t.SetField("hasBeenActivated", true);
             t.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2");
             t.PlaySound("switch_auto_lights_on");
-            int time = 0;
-            OnInterval(50, () =>
-            {
-                if (time > 10)
-                {
-                    t.SetField("hasBeenActivated", false);
-                    t.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2_busted");
-                    t.PlaySound("switch_auto_lights_off");
-                    return false;
-                }
-                else if (triggerDome.GetField<bool>("hasBeenActivated"))
-                {
-                    t.PlaySound("ims_plant");
-                    removeUsable(t);
-                    return false;
-                }
-                time++;
-                return true;
-            });
-        }
-        private static void dome_checkEasterEggStep4_B(Entity t, Entity player)//Bunker
-        {
+            t.SetField("time", 0);
             Entity triggerBunker = GetEnt("aiz_dome_cabinet_trigger_bunker", "targetname");
-            if (t.GetField<bool>("hasBeenActivated")) return;
 
-            t.SetField("hasBeenActivated", true);
-            t.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2");
-            t.PlaySound("switch_auto_lights_on");
-            int time = 0;
-            OnInterval(50, () =>
-            {
-                if (time > 10)
-                {
-                    t.SetField("hasBeenActivated", false);
-                    t.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2_busted");
-                    t.PlaySound("switch_auto_lights_off");
-                    return false;
-                }
-                else if (triggerBunker.GetField<bool>("hasBeenActivated"))
-                {
-                    t.PlaySound("ims_plant");
-                    removeUsable(t);
-                    dome_easterEggReward();
-                    return false;
-                }
-                time++;
-                return true;
-            });
+            OnInterval(50, () => dome_monitorEasterEggStep4_B(t, triggerBunker));
         }
-        /*
-        private static void dome_easterEggStep5()
+        private static bool dome_monitorEasterEggStep4_B(Entity trigger, Entity triggerBunker)
         {
-           
+            if (trigger.GetField<int>("time") > 10)
+            {
+                trigger.SetField("hasBeenActivated", false);
+                trigger.GetField<Entity>("cabinet").SetModel("icbm_electronic_cabinet2_busted");
+                trigger.PlaySound("switch_auto_lights_off");
+                return false;
+            }
+            else if (triggerBunker.GetField<bool>("hasBeenActivated"))
+            {
+                trigger.PlaySound("ims_plant");
+                removeUsable(trigger);
+                dome_easterEggReward();
+                return false;
+            }
+            trigger.SetField("time", trigger.GetField<int>("time") + 1);
+            return true;
         }
-        */
         private static void easterEgg_awardAllPerks(Entity player = null)
         {
             if (player != null)
             {
                 bonusDrops.giveAllPerks(player);
                 player.SetField("allPerks", true);
-                hud.scoreMessage(player, "All Perks Awarded!");
+                hud.scoreMessage(player, AIZ.gameStrings[327]);
             }
             else
             {
@@ -4040,7 +4254,7 @@ namespace AIZombiesSupreme
 
                     bonusDrops.giveAllPerks(players);
                     players.SetField("allPerks", true);
-                    hud.scoreMessage(players, "All Perks Awarded!");
+                    hud.scoreMessage(players, AIZ.gameStrings[327]);
                 }
             }
         }
@@ -4059,16 +4273,17 @@ namespace AIZombiesSupreme
             weapCrate.SetModel("com_plasticcase_green_rifle");
 
             Entity weapon = wallWeapon(weapCrate.Origin + new Vector3(15, 0, 10), weapCrate.Angles - new Vector3(0, 0, 90), "stinger_mp", 0);
-            OnInterval(100, () =>
+            OnInterval(100, () => dome_watchEasterEggReward(weapon));
+        }
+        private static bool dome_watchEasterEggReward(Entity weapon)
+        {
+            if (weapon.GetField<bool>("bought"))
             {
-                if (weapon.GetField<bool>("bought"))
-                {
-                    PlayFX(AIZ.fx_disappear, weapon.Origin);
-                    removeUsable(weapon);
-                    return false;
-                }
-                else return true;
-            });
+                PlayFX(AIZ.fx_disappear, weapon.Origin);
+                removeUsable(weapon);
+                return false;
+            }
+            else return true;
         }
         #endregion
         #endregion

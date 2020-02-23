@@ -9,12 +9,12 @@ namespace AIZombiesSupreme
         public static bool nukeInbound = false;
         public static int empKills = 25;
         private static byte nukeTime = 10;
-        //public static int mapStreakKills = -1;
-        //public static string mapStreakWeapon = "killstreak_double_uav_mp";
-        //public static string mapStreakIcon = "specialty_placeholder";
-        //public static string mapStreakName = "Map Killstreak";
+        public static int mapStreakKills = -1;
+        public static string mapStreakWeapon = "killstreak_double_uav_mp";
+        public static string mapStreakIcon = "specialty_placeholder";
+        public static string mapStreakName = AIZ.gameStrings[215];
         private static bool littlebirdOut = false;
-        //private static bool mapStreakOut = false;
+        private static bool mapStreakOut = false;
 
         public static readonly string botAnim_idle = "pb_stand_alert";
         public static readonly string botAnim_idleRPG = "pb_stand_alert_RPG";
@@ -85,6 +85,14 @@ namespace AIZombiesSupreme
                 player.SetActionSlot(5, "weapon", "strike_marker_mp");
                 player.SetField("ownsAirstrike", true);
             }
+            else if (streak == 250)
+            {
+                player.PlayLocalSound("US_1mc_achieve_turret");
+                player.ShowHudSplash("sentry_gl", 0, streak);
+                player.GiveWeapon("killstreak_remote_turret_mp", 0, false);
+                player.SetActionSlot(5, "weapon", "killstreak_remote_turret_mp");
+                player.SetField("ownsSentryGL", true);
+            }
             else if (streak == 300)
             {
                 //player.PlayLocalSound("US_1mc_");
@@ -128,20 +136,18 @@ namespace AIZombiesSupreme
             else if (streak == 1000 && AIZ._mapname != "mp_carbon" && AIZ._mapname != "mp_cement" && !player.GetField<bool>("ownsBot"))//Disabled on carbon and cement for crappy optimization
             {
                 player.SetField("ownsBot", true);
-                player.IPrintLnBold("1000 Kill Streak!");
-                AfterDelay(1000, () => player.IPrintLnBold("Permanent Bot Achieved!"));
+                player.IPrintLnBold(AIZ.gameStrings[216]);
+                AfterDelay(1000, () => player.IPrintLnBold(AIZ.gameStrings[217]));
                 spawnBotForPlayer(player);
             }
-            /*
             else if (streak == mapStreakKills)
             {
-                player.PlayLocalSound("mp_killstreak_choppergunner");
+                player.PlayLocalSound("counter_uav_activate");
                 player.GiveWeapon(mapStreakWeapon, 0, false);
                 player.SetActionSlot(7, "weapon", mapStreakWeapon);
-                player.IPrintLnBold("^3" + mapStreakName + " ^7ready for usage!");
+                player.IPrintLnBold(string.Format(AIZ.gameStrings[218], mapStreakName));
                 player.SetField("ownsMapStreak", true);
             }
-            */
             shuffleStreaks(player);//update HUD
         }
 
@@ -177,22 +183,25 @@ namespace AIZombiesSupreme
                 case 8:
                     streak = 200;
                     break;
-                case 9:
+                case 10:
                     streak = 150;
                     break;
-                case 10:
-                    streak = 400;
+                case 9:
+                    streak = 250;
                     break;
                 case 11:
+                    streak = 400;
+                    break;
+                case 12:
                     bonusDrops.spawnBonusDrop(bonusDrops.dropTypes.doublePoints, player.Origin);
                     return;
-                case 12:
+                case 13:
                     bonusDrops.spawnBonusDrop(bonusDrops.dropTypes.instaKill, player.Origin);
                     return;
-                case 13:
+                case 14:
                     bonusDrops.spawnBonusDrop(bonusDrops.dropTypes.nuke, player.Origin);
                     return;
-                case 14:
+                case 15:
                     bonusDrops.spawnBonusDrop(bonusDrops.dropTypes.gun, player.Origin);
                     return;
                 default:
@@ -219,12 +228,17 @@ namespace AIZombiesSupreme
             }
             else if (player.GetField<bool>("ownsSentry") && newWeap == "killstreak_sentry_mp")
             {
-                spawnSentry(player);
+                spawnSentry(player, false);
                 //Entity sentryModel = d_killstreaks.spawnSentry(player);
                 //if (sentryModel != null)
                 //d_killstreaks.sentryHoldWatcher(player, sentryModel, true);
                 player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
                 //player.DisableWeapons();
+            }
+            else if (player.GetField<bool>("ownsSentryGL") && newWeap == "killstreak_remote_turret_mp")
+            {
+                spawnSentry(player, true);
+                player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
             }
             else if (player.GetField<bool>("ownsLittlebird") && newWeap == "killstreak_uav_mp")
             {
@@ -232,12 +246,12 @@ namespace AIZombiesSupreme
                 {
                     Entity littlebirdModel = spawnLittlebird(player);
                     if (littlebirdModel != null)
-                        littlebirdHoldWatcher(player, littlebirdModel);
+                        holdLittlebird(player, littlebirdModel);
                     else return;
                 }
                 else
                 {
-                    player.IPrintLnBold("Airspace too crowded.");
+                    player.IPrintLnBold(AIZ.gameStrings[220]);
                     player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
                     player.EnableWeapons();
                     return;
@@ -272,7 +286,7 @@ namespace AIZombiesSupreme
             {
                 if (player.HasField("isCurrentlyTeleported"))
                 {
-                    player.IPrintLnBold("Cannot call in Heli Sniper while teleporting");
+                    player.IPrintLnBold(AIZ.gameStrings[221]);
                     player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
                     return;
                 }
@@ -291,11 +305,10 @@ namespace AIZombiesSupreme
                 }
                 else
                 {
-                    player.IPrintLnBold("Cannot call in Heli Sniper here");
+                    player.IPrintLnBold(AIZ.gameStrings[222]);
                     player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
                 }
             }
-            /*
             else if (player.GetField<bool>("ownsMapStreak") && newWeap == mapStreakWeapon)
             {
                 bool success = tryUseMapStreak(player);
@@ -303,16 +316,17 @@ namespace AIZombiesSupreme
 
                 if (!success)
                 {
+                    player.IPrintLnBold(mapStreakName + AIZ.gameStrings[223]);
                     player.SwitchToWeapon(lastWeapon);
                     return;
                 }
 
                 player.SetField("ownsMapStreak", false);
+                shuffleStreaks(player);
                 AfterDelay(750, () =>
                         player.TakeWeapon(mapStreakWeapon));
                 player.SwitchToWeapon(lastWeapon);
             }
-            */
         }
 
         private static void shuffleStreaks(Entity player)
@@ -339,6 +353,8 @@ namespace AIZombiesSupreme
                 player.SetActionSlot(6, "weapon", "deployable_vest_marker_mp");
             else if (player.GetField<bool>("ownsEMP"))
                 player.SetActionSlot(6, "weapon", "killstreak_emp_mp");
+            else if (player.GetField<bool>("ownsSentryGL"))
+                player.SetActionSlot(6, "weapon", "killstreak_remote_turret_mp");
 
             if (player.GetField<bool>("ownsNuke"))
                 player.SetActionSlot(7, "weapon", "killstreak_helicopter_mp");
@@ -348,8 +364,8 @@ namespace AIZombiesSupreme
                 //Fix for no ammo on chaining crate streaks
                 player.SetWeaponAmmoClip("airdrop_trap_marker_mp", 1);
             }
-            //if (player.GetField<bool>("ownsMapStreak"))
-            //player.SetActionSlot(7, "weapon", mapStreakWeapon);
+            if (player.GetField<bool>("ownsMapStreak"))
+                player.SetActionSlot(7, "weapon", mapStreakWeapon);
 
             //Set the HUD for this
             string[] streaks = new string[4] { "", "", "", "" };
@@ -371,13 +387,15 @@ namespace AIZombiesSupreme
                 streaks[2] = hud.createHudShaderString("specialty_deployable_vest") + "[{+actionslot 6}]";
             else if (player.GetField<bool>("ownsEMP"))
                 streaks[2] = hud.createHudShaderString("specialty_emp") + "[{+actionslot 6}]";
+            else if (player.GetField<bool>("ownsSentryGL"))
+                streaks[2] = hud.createHudShaderString("specialty_remote_mg_turret") + "[{+actionslot 6}]";
 
             if (player.GetField<bool>("ownsNuke"))
                 streaks[3] = hud.createHudShaderString("dpad_killstreak_nuke_static") + "[{+actionslot 7}]";
             else if (player.GetField<bool>("ownsEmergencyAirdrop"))
                 streaks[3] = hud.createHudShaderString("specialty_airdrop_emergency") + "[{+actionslot 7}]";
-            //if (player.GetField<bool>("ownsMapStreak"))
-            //streaks[3] = hud.createHudShaderString(mapStreakIcon) + "[{+actionslot 7}]";
+            if (player.GetField<bool>("ownsMapStreak"))
+                streaks[3] = hud.createHudShaderString(mapStreakIcon) + "[{+actionslot 7}]";
 
             if (!player.HasField("aizHud_created")) return;
 
@@ -388,13 +406,16 @@ namespace AIZombiesSupreme
             list.SetText(newText);
         }
 
-        public static void spawnSentry(Entity player)
+        public static void spawnSentry(Entity player, bool isGL)
         {
-            if (player.GetField<bool>("isCarryingSentry")) return; 
+            if (player.GetField<bool>("isCarryingSentry")) return;
 
-            Entity turret = SpawnTurret("misc_turret", player.Origin, "sentry_minigun_mp");
+            string weapon = isGL ? "manned_gl_turret_mp" : "sentry_minigun_mp";
+            string model = isGL ? "sentry_grenade_launcher" : "sentry_minigun";
+            Entity turret = SpawnTurret("misc_turret", player.Origin, weapon);
             turret.Angles = new Vector3(0, player.GetPlayerAngles().Y, 0);
             turret.SetModel("sentry_minigun");
+            turret.SetField("baseModel", model);
             //turret.Health = 1000;
             //turret.SetCanDamage(true);
             turret.MakeTurretInOperable();
@@ -403,12 +424,15 @@ namespace AIZombiesSupreme
             turret.SetBottomArc(50);
             turret.MakeUnUsable();
             turret.SetDefaultDropPitch(-89.0f);
+            if (isGL) turret.SetConvergenceTime(1);
             turret.SetTurretModeChangeWait(true);
             turret.SetMode("sentry_offline");
             turret.SetField("owner", player);
             turret.SetTurretTeam("allies");
             turret.SetSentryOwner(player);
             turret.SetField("isSentry", true);
+            turret.SetField("isSentryGL", isGL);
+            if (isGL) turret.SetField("readyToFire", true);
 
             turret.SetTurretMinimapVisible(true);
             int objID = mapEdit.getNextRealObjID();
@@ -418,6 +442,7 @@ namespace AIZombiesSupreme
             turret.SetField("isBeingCarried", true);
             turret.SetField("canBePlaced", true);
             turret.SetField("timeLeft", 90);
+            if (isGL) turret.SetField("timeLeft", 120);
             turret.SetField("target", turret);
             Entity trigger = Spawn("trigger_radius", turret.Origin + new Vector3(0, 0, 1), 0, 105, 64);
             turret.SetField("trigger", trigger);
@@ -426,53 +451,64 @@ namespace AIZombiesSupreme
 
             OnInterval(1000, () => sentry_timer(turret));
             OnInterval(50, () => sentry_targeting(turret));
-            sentryHoldWatcher(player, turret, true);
+            pickupSentry(player, turret, true);
         }
 
-        public static void sentryHoldWatcher(Entity player, Entity sentry, bool canCancel)
+        public static void pickupSentry(Entity player, Entity sentry, bool canCancel)
         {
             sentry.ClearTargetEntity();
             sentry.SetMode("sentry_offline");
             sentry.SetField("isBeingCarried", true);
             player.SetField("isCarryingSentry", true);
+            player.SetField("isCarryingSentry_alt", true);//Used to fix a bug allowing players to 'faux-cancel' a placement causing a persistant sentry being held
             sentry.SetField("canBePlaced", true);
             player.DisableWeapons();
             //sentry.SetCanDamage(false);
             sentry.SetSentryCarrier(player);
-            sentry.SetModel("sentry_minigun_obj");
+            sentry.SetModel(sentry.GetField<string>("baseModel") + "_obj");
 
-            OnInterval(50, () =>
+            OnInterval(50, () => sentryHoldWatcher(player, sentry, canCancel));
+        }
+        private static bool sentryHoldWatcher(Entity player, Entity sentry, bool canCancel)
+        {
+            if (AIZ.gameEnded) return false;
+            if (!player.IsAlive || !AIZ.isPlayer(player)) return false;
+            if (sentry.GetField<bool>("canBePlaced") && player.GetField<bool>("isCarryingSentry") && player.AttackButtonPressed() && player.IsOnGround())
             {
-                if (AIZ.gameEnded) return false;
-                if (!player.IsAlive || !AIZ.isPlayer(player)) return false;
-                if (sentry.GetField<bool>("canBePlaced") && player.GetField<bool>("isCarryingSentry") && player.AttackButtonPressed() && player.IsOnGround())
+                player.EnableWeapons();
+                if (canCancel && sentry.GetField<bool>("isSentryGL"))
                 {
-                    player.EnableWeapons();
-                    if (canCancel)
-                    {
-                        AIZ.teamSplash("used_sentry", player);
-                        player.TakeWeapon("killstreak_sentry_mp");
-                        player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
-                        player.SetField("ownsSentry", false);
-                        shuffleStreaks(player);
-                    }
-                    player.SetField("isCarryingSentry", false);
-                    //sentry.SetField("carriedBy");
-                    sentry.SetSentryCarrier(null);
-                    Vector3 angleToForward = AnglesToForward(new Vector3(0, player.GetPlayerAngles().Y, 0));
-                    sentry.Origin = player.Origin + angleToForward * 50;
-                    sentry.Angles = new Vector3(0, player.GetPlayerAngles().Y, 0);
-                    sentry.SetField("isBeingCarried", false);
-                    sentry.SetModel("sentry_minigun");
-                    sentry.PlaySound("sentry_gun_plant");
-                    //turret.SetCanDamage(true);
-                    sentry.SetMode("sentry");   
-                    //AfterDelay(500, () => StartAsync(handlePickup(sentry)));
-                    AfterDelay(500, () => handlePickupInterval(sentry));
-                    return false;
+                    AIZ.teamSplash("used_gl_turret", player);
+                    player.TakeWeapon("killstreak_remote_turret_mp");
+                    player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
+                    player.SetField("ownsSentryGL", false);
+                    shuffleStreaks(player);
                 }
-                else return true;
-            });
+                else if (canCancel)
+                {
+                    AIZ.teamSplash("used_sentry", player);
+                    player.TakeWeapon("killstreak_sentry_mp");
+                    player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
+                    player.SetField("ownsSentry", false);
+                    shuffleStreaks(player);
+                }
+                player.SetField("isCarryingSentry", false);
+                player.ClearField("isCarryingSentry_alt");
+                //sentry.SetField("carriedBy");
+                sentry.SetSentryCarrier(null);
+                Vector3 angleToForward = AnglesToForward(new Vector3(0, player.GetPlayerAngles().Y, 0));
+                sentry.Origin = player.Origin + angleToForward * 50;
+                sentry.Angles = new Vector3(0, player.GetPlayerAngles().Y, 0);
+                sentry.SetField("isBeingCarried", false);
+                sentry.SetModel(sentry.GetField<string>("baseModel"));
+                sentry.PlaySound("sentry_gun_plant");
+                //turret.SetCanDamage(true);
+                sentry.SetMode("sentry");
+                //AfterDelay(500, () => StartAsync(handlePickup(sentry)));
+                AfterDelay(500, () => handlePickupInterval(sentry));
+                return false;
+            }
+            else return true;
         }
 
         private static bool sentry_timer(Entity sentry)
@@ -499,6 +535,10 @@ namespace AIZombiesSupreme
                     {
                         if (!b.GetField<bool>("isAlive")) continue;
                         Entity botHitbox = b.GetField<Entity>("hitbox");
+
+                        if (sentry.GetField<bool>("isSentryGL"))
+                            if (botHitbox.Origin.DistanceTo(sentry.Origin) > 1500) continue;
+
                         bool tracePass = SightTracePassed(sentry.GetTagOrigin("tag_flash"), botHitbox.Origin, false, botHitbox);
                         if (!tracePass)
                             continue;
@@ -515,7 +555,8 @@ namespace AIZombiesSupreme
                     if (sentry.GetField<Entity>("target") != sentry)
                     {
                         sentry.SetTargetEntity(sentry.GetField<Entity>("target"));
-                        sentry.ShootTurret();
+                        if (sentry.GetField<bool>("isSentryGL") && sentry.GetField<bool>("readyToFire")) StartAsync(sentryGL_fireTurret(sentry));
+                        else if (!sentry.GetField<bool>("isSentryGL")) sentry.ShootTurret();
                     }
                     else
                         sentry.ClearTargetEntity();
@@ -525,6 +566,17 @@ namespace AIZombiesSupreme
                 else return true;
             }
             else return false;
+        }
+        private static IEnumerator sentryGL_fireTurret(Entity sentry)
+        {
+            sentry.SetField("readyToFire", false);
+
+            yield return Wait(1);
+            sentry.ShootTurret();
+
+            yield return Wait(3);
+
+            sentry.SetField("readyToFire", true);
         }
         /*
         private static IEnumerator handlePickup(Entity turret)
@@ -553,25 +605,19 @@ namespace AIZombiesSupreme
         */
         private static void handlePickupInterval(Entity turret)
         {
-            //if (!Utilities.isEntDefined(turret)) return;
-
-            Entity owner = turret.GetField<Entity>("owner");
-            Entity trigger = turret.GetField<Entity>("trigger");
-
-            //if (!Utilities.isEntDefined(trigger)) return;
-
-            OnInterval(100, () =>
+            OnInterval(100, () => watchForSentryPickup(turret, turret.GetField<Entity>("owner"), turret.GetField<Entity>("trigger")));
+        }
+        private static bool watchForSentryPickup(Entity turret, Entity owner, Entity trigger)
+        {
+            if (AIZ.gameEnded) return false;
+            if (owner.IsAlive && owner.IsTouching(trigger) && owner.IsOnGround() && owner.UseButtonPressed())
             {
-                if (AIZ.gameEnded) return false;
-                if (owner.IsAlive && owner.IsTouching(trigger) && owner.IsOnGround() && owner.UseButtonPressed())
-                {
-                    if (!owner.GetField<bool>("isCarryingSentry") && !turret.GetField<bool>("isBeingCarried"))
-                        sentryHoldWatcher(owner, turret, false);
-                    return false;
-                }
-                if (owner.IsAlive && turret.Health > 0) return true;
-                else return false;
-            });
+                if (!owner.GetField<bool>("isCarryingSentry") && !turret.GetField<bool>("isBeingCarried"))
+                    pickupSentry(owner, turret, false);
+                return false;
+            }
+            if (owner.IsAlive && turret.Health > 0) return true;
+            else return false;
         }
 
         public static IEnumerator destroySentry(Entity sentry)
@@ -597,11 +643,15 @@ namespace AIZombiesSupreme
             sentry.SetDefaultDropPitch(40);
             sentry.SetMode("sentry_offline");
             sentry.Health = 0;
-            sentry.SetModel("sentry_minigun_destroyed");
+            sentry.SetModel(sentry.GetField<string>("baseModel") + "_destroyed");
             sentry.PlaySound("sentry_explode");
 
             Entity owner = sentry.GetField<Entity>("owner");
-            if (owner.IsAlive) owner.PlayLocalSound("US_1mc_sentry_gone");
+            if (owner.IsAlive)
+            {
+                if (sentry.GetField<bool>("isSentryGL")) owner.PlayLocalSound("US_1mc_turret_destroyed");
+                else owner.PlayLocalSound("US_1mc_sentry_gone");
+            }
 
             PlayFXOnTag(AIZ.fx_sentryExplode, sentry, "tag_aim");
             yield return Wait(1.5f);
@@ -616,6 +666,7 @@ namespace AIZombiesSupreme
             sentry.ClearField("realObjID");
             sentry.ClearField("owner");
             sentry.ClearField("isSentry");
+            sentry.ClearField("isSentryGL");
             sentry.Delete();
         }
 
@@ -737,7 +788,7 @@ namespace AIZombiesSupreme
 
             if (nukeInbound)
             {
-                player.IPrintLnBold("Nuke already inbound!");
+                player.IPrintLnBold(AIZ.gameStrings[224]);
                 return false;
             }
             nukeInbound = true;
@@ -759,7 +810,7 @@ namespace AIZombiesSupreme
             nukeTimer.HideWhenInMenu = true;
             nukeTimer.Font = HudElem.Fonts.HudBig;
             nukeTimer.FontScale = 1;
-            nukeTimer.SetText("Nuke Incoming In: 10");
+            nukeTimer.SetText(string.Format(AIZ.gameStrings[225], 10));
             nukeTimer.Color = new Vector3(.7f, 0, 0);
             nukeTimer.GlowColor = new Vector3(0, 0, .5f);
             nukeTimer.GlowAlpha = .4f;
@@ -794,7 +845,7 @@ namespace AIZombiesSupreme
             nukeTimer.FontScale = 1.25f;
             yield return Wait(.2f);
 
-            if (nukeTime > 0) nukeTimer.SetText("Nuke Incoming In: " + nukeTime);
+            if (nukeTime > 0) nukeTimer.SetText(string.Format(AIZ.gameStrings[225], nukeTime));
             nukeTimer.ChangeFontScaleOverTime(.2f);
             nukeTimer.FontScale = 1;
         }
@@ -831,6 +882,7 @@ namespace AIZombiesSupreme
             turret.SetSentryOwner(player);
             turret.SetTurretTeam("allies");
             //turret.SetTurretMinimapVisible(true);
+            turret.HideAllParts();
             turret.SetField("isBeingCarried", true);
             turret.SetField("canBePlaced", true);
 
@@ -842,7 +894,7 @@ namespace AIZombiesSupreme
             turret.SetField("visual", visual);
             return turret;
         }
-        public static void littlebirdHoldWatcher(Entity player, Entity bird)
+        public static void holdLittlebird(Entity player, Entity bird)
         {
             bird.SetField("isBeingCarried", true);
             player.SetField("isCarryingSentry", true);
@@ -850,55 +902,56 @@ namespace AIZombiesSupreme
             player.DisableWeapons();
             bird.SetSentryCarrier(player);
             bird.SetCanDamage(false);
-            OnInterval(100, () =>
+            OnInterval(100, () => littlebirdHoldWatcher(bird, player));
+        }
+        private static bool littlebirdHoldWatcher(Entity bird, Entity player)
+        {
+            if (AIZ.gameEnded) return false;
+
+            Entity birdVisual = bird.GetField<Entity>("visual");
+            Vector3 anglesToForward = AnglesToForward(new Vector3(0, player.GetPlayerAngles().Y, 0));
+            Vector3 traceOrigin = player.Origin + (anglesToForward * 75);
+            bool trace = SightTracePassed(traceOrigin + new Vector3(0, 0, 25), traceOrigin + new Vector3(0, 0, 500), false, birdVisual);
+
+            if (trace && birdVisual.Model == "test_vehicle_little_bird_toy_placement_failed")
             {
-                if (AIZ.gameEnded) return false;
+                //Utilities.PrintToConsole("Trace passed and setting model");
+                birdVisual.SetModel("test_vehicle_little_bird_toy_placement");
+                bird.SetField("canBePlaced", true);
+            }
+            else if (!trace && birdVisual.Model == "test_vehicle_little_bird_toy_placement")
+            {
+                //Utilities.PrintToConsole("Trace failed and setting model");
+                birdVisual.SetModel("test_vehicle_little_bird_toy_placement_failed");
+                bird.SetField("canBePlaced", false);
+            }
 
-                Entity birdVisual = bird.GetField<Entity>("visual");
-                Vector3 anglesToForward = AnglesToForward(new Vector3(0, player.GetPlayerAngles().Y, 0));
-                Vector3 traceOrigin = player.Origin + (anglesToForward * 75);
-                bool trace = SightTracePassed(traceOrigin + new Vector3(0, 0, 25), traceOrigin + new Vector3(0, 0, 500), false, birdVisual);
-
-                if (trace && birdVisual.Model == "test_vehicle_little_bird_toy_placement_failed")
-                {
-                    //Utilities.PrintToConsole("Trace passed and setting model");
-                    birdVisual.SetModel("test_vehicle_little_bird_toy_placement");
-                    bird.SetField("canBePlaced", true);
-                }
-                else if (!trace && birdVisual.Model == "test_vehicle_little_bird_toy_placement")
-                {
-                    //Utilities.PrintToConsole("Trace failed and setting model");
-                    birdVisual.SetModel("test_vehicle_little_bird_toy_placement_failed");
-                    bird.SetField("canBePlaced", false);
-                }
-
-                if (player.IsAlive && player.AttackButtonPressed() && bird.GetField<bool>("canBePlaced") && player.GetField<bool>("isCarryingSentry"))
-                {
-                    player.EnableWeapons();
-                    AfterDelay(750, () => player.TakeWeapon("killstreak_uav_mp"));
-                    string lastWeapon = player.GetField<string>("lastDroppableWeapon");
-                    player.SwitchToWeapon(lastWeapon);
-                    player.SetField("ownsLittlebird", false);
-                    //foreach (Entity players in Players)
-                    //if (AIZ.isPlayer(players)) 
-                    player.PlaySound("US_1mc_use_dragonfly");
-                    shuffleStreaks(player);
-                    player.SetField("isCarryingSentry", false);
-                    bird.SetSentryCarrier(null);
-                    bird.SetField("isBeingCarried", false);
-                    bird.PlaySound("sentry_gun_plant");
-                    AIZ.teamSplash("used_remote_uav", player);
-                    float playerAngleY = player.GetPlayerAngles().Y;
-                    Vector3 angleToForward = AnglesToForward(new Vector3(0, playerAngleY, 0));
-                    Vector3 sentryAngles = new Vector3(0, playerAngleY, 0);
-                    Vector3 origin = player.Origin + angleToForward * 50;
-                    spawnRemoteUAV(player, origin, sentryAngles);
-                    bird.Delete();
-                    bird.GetField<Entity>("visual").Delete();
-                    return false;
-                }
-                else return true;
-            });
+            if (player.IsAlive && player.AttackButtonPressed() && bird.GetField<bool>("canBePlaced") && player.GetField<bool>("isCarryingSentry"))
+            {
+                player.EnableWeapons();
+                AfterDelay(750, () => player.TakeWeapon("killstreak_uav_mp"));
+                string lastWeapon = player.GetField<string>("lastDroppableWeapon");
+                player.SwitchToWeapon(lastWeapon);
+                player.SetField("ownsLittlebird", false);
+                //foreach (Entity players in Players)
+                //if (AIZ.isPlayer(players)) 
+                player.PlaySound("US_1mc_use_dragonfly");
+                shuffleStreaks(player);
+                player.SetField("isCarryingSentry", false);
+                bird.SetSentryCarrier(null);
+                bird.SetField("isBeingCarried", false);
+                bird.PlaySound("sentry_gun_plant");
+                AIZ.teamSplash("used_remote_uav", player);
+                float playerAngleY = player.GetPlayerAngles().Y;
+                Vector3 angleToForward = AnglesToForward(new Vector3(0, playerAngleY, 0));
+                Vector3 sentryAngles = new Vector3(0, playerAngleY, 0);
+                Vector3 origin = player.Origin + angleToForward * 50;
+                spawnRemoteUAV(player, origin, sentryAngles);
+                bird.Delete();
+                bird.GetField<Entity>("visual").Delete();
+                return false;
+            }
+            else return true;
         }
 
         private static void spawnRemoteUAV(Entity owner, Vector3 pos, Vector3 angles)
@@ -930,7 +983,7 @@ namespace AIZombiesSupreme
 
             HudElem hint = HudElem.CreateFontString(owner, HudElem.Fonts.HudSmall, 1);
             hint.SetPoint("CENTER", "CENTER", 0, 140);
-            hint.SetText("Press ^3[{vote no}] ^7to re-route the drone");
+            hint.SetText(AIZ.gameStrings[228]);
             //owner.SetField("hud_lbHint", hint);
             AfterDelay(4000, () =>
                 hint.Destroy());
@@ -996,6 +1049,7 @@ namespace AIZombiesSupreme
         public static void dragonfly_rerouteWatcher(Entity player)
         {
             if ((player.HasField("ownedLittlebird") && !player.GetField<Entity>("ownedLittlebird").GetField<bool>("isAlive"))) return;
+            if (player.HasField("isCarryingSentry_alt")) return;//Used to fix a bug allowing players to 'faux-cancel' a placement causing a persistant sentry being held
 
             else if (player.GetField<bool>("isCarryingSentry"))
             {
@@ -1353,6 +1407,7 @@ namespace AIZombiesSupreme
                         break;
                 }
                 bot.SetField("state", "idle");
+                bot.SetField("isMoving", false);
                 bot.SetField("target", bot);
                 return false;
             }
@@ -1425,10 +1480,11 @@ namespace AIZombiesSupreme
             if (oldGun == bot.GetField<string>("currentGun")) botGunEnt.ShowPart("tag_clip");//Avoid trying to show the tag if we switched guns, causes a crash
             bot.SetField("shots", 0);
             bot.SetField("state", "idle");
+            bot.SetField("isMoving", false);
             bot.SetField("target", bot);
         }
 
-        public static void killPlayerBotOnDeath(Entity owner)
+        public static IEnumerator killPlayerBotOnDeath(Entity owner)
         {
             Entity bot = owner.GetField<Entity>("bot");
             bot.SetField("state", "dead");
@@ -1442,12 +1498,12 @@ namespace AIZombiesSupreme
 
             bot.StartRagdoll();
             PhysicsExplosionSphere(bot.Origin, 75, 75, AIZ.rng.Next(1, 3));
-            AfterDelay(5000, () =>
-            {
-                Entity head = bot.GetField<Entity>("head");
-                head.Delete();
-                bot.Delete();
-            });
+
+            yield return Wait(5);
+
+            Entity head = bot.GetField<Entity>("head");
+            head.Delete();
+            bot.Delete();
         }
 
         public static bool canCallInHeliSniper(Vector3 pos)
@@ -1491,10 +1547,10 @@ namespace AIZombiesSupreme
             lb.SetField("heliTime", 120);
             owner.SetField("ownsHeliSniper", false);
             shuffleStreaks(owner);
-            StartAsync(heliSniperFlyIn(owner, lb, location));
-            heliSniper_leaveOnPlayerDeath(lb, owner);
+            StartAsync(heliSniper_flyIn(owner, lb, location));
+            OnInterval(200, () => heliSniper_leaveOnPlayerDeath(lb, owner));
         }
-        private static IEnumerator heliSniperFlyIn(Entity owner, Entity lb, Vector3 loc)
+        private static IEnumerator heliSniper_flyIn(Entity owner, Entity lb, Vector3 loc)
         {
             if (heliHeight > loc.Z && heliHeight - loc.Z > 500)
                 lb.SetVehGoalPos(new Vector3(loc.X, loc.Y, heliHeight), true);
@@ -1513,7 +1569,7 @@ namespace AIZombiesSupreme
 
             if (lb.GetField<bool>("doneService")) yield break;
             lb.SetField("flying", false);
-            OnInterval(1000, () => heliTimer(lb));
+            OnInterval(1000, () => heliSniper_runTimer(lb));
             lb.SetField("readyForEnter", true);
             Entity enterPos = Spawn("script_model", lb.Origin);
             enterPos.SetModel("tag_origin");
@@ -1534,7 +1590,7 @@ namespace AIZombiesSupreme
             enterPos.SetField("icon", new Parameter(headIcon));
             mapEdit.makeUsable(enterPos, "heliExtraction", 70);
         }
-        private static bool heliTimer(Entity lb)
+        private static bool heliSniper_runTimer(Entity lb)
         {
             if (!lb.GetField<bool>("flying") && !lb.GetField<bool>("doneService"))
             {
@@ -1543,7 +1599,7 @@ namespace AIZombiesSupreme
                 if (AIZ.gameEnded) { lb.SetField("hasPassenger", false); time = 0; }
                 if (time == 0)
                 {
-                    StartAsync(heliLeave(lb));
+                    StartAsync(heliSniper_leave(lb));
                     return false;
                 }
                 else return true;
@@ -1551,7 +1607,7 @@ namespace AIZombiesSupreme
             else if (!lb.GetField<bool>("doneService")) return true;
             else return false;
         }
-        public static IEnumerator doHeliBoard(Entity heli, Entity player)
+        public static IEnumerator heliSniper_doBoarding(Entity heli, Entity player)
         {
             //player.Hide();
             player.SetField("isInHeliSniper", true);
@@ -1575,9 +1631,9 @@ namespace AIZombiesSupreme
 
             if (AIZ.gameEnded) yield break;//Abort if game has ended
 
-            StartAsync(animateHeliEnter(player, cam, heli));
+            StartAsync(heliSniper_animateEnter(player, cam, heli));
         }
-        public static IEnumerator animateHeliEnter(Entity player, Entity cam, Entity heli)
+        public static IEnumerator heliSniper_animateEnter(Entity player, Entity cam, Entity heli)
         {
             Vector3 tag = heli.GetTagOrigin("tag_player_attach_left") + new Vector3(0, 0, 30);
             Vector3 tagAngles = heli.GetTagAngles("tag_player_attach_left");
@@ -1585,12 +1641,9 @@ namespace AIZombiesSupreme
             Vector3 angleToHeli = VectorToAngles(tag - front);
             cam.MoveTo(front - new Vector3(0, 0, 100), .5f, .1f, .1f);
             cam.RotateTo(angleToHeli, .5f, .1f, .1f);
-            //clone.Show();
-            //clone.RotateTo(angleToHeli, .5f, .3f, .3f);
-            //clone.LinkTo(player, "tag_origin");
 
             //--Begin movement onto heli--
-            //Possible add our viewmodel here, show it to player only, and play a viewmodel_ anim on it if we can find a mantle anim
+            //Possibly add our viewmodel here, show it to player only, and play a viewmodel_ anim on it if we can find a mantle anim
             yield return Wait(.55f);
             cam.RotatePitch(-60, 1, .1f, .2f);
             cam.MoveTo(front - new Vector3(0, 0, 50), .5f, .1f, .1f);
@@ -1618,22 +1671,25 @@ namespace AIZombiesSupreme
             player.Show();
             player.AllowJump(false);
             player.AllowSprint(false);
-            OnInterval(50, () =>
-            {
-                if (player.GetStance() != "crouch") player.SetStance("crouch");
-                if (player.GetField<bool>("isInHeliSniper")) return true;
-                else return false;
-            });
+            OnInterval(50, () => heliSniper_monitorStance(player));
             player.FreezeControls(false);
             player.EnableWeapons();
             player.SwitchToWeapon("iw5_mk12spr_mp_acog_xmags");
             player.DisableWeaponSwitch();
             player.SetSpreadOverride(1);
             AfterDelay(2000, () => player.Player_RecoilScaleOn(0));
-            StartAsync(heliSniperFlyUp(heli, player));
-            heliSniper_leaveOnAmmoDepleted(heli, player);
+            StartAsync(heliSniper_flyUp(heli, player));
+            OnInterval(1000, () => heliSniper_leaveOnAmmoDepleted(heli, player));
         }
-        private static IEnumerator heliSniperFlyUp(Entity lb, Entity player)
+        private static bool heliSniper_monitorStance(Entity player)
+        {
+            if (!player.IsAlive) return false;
+
+            if (player.GetStance() != "crouch") player.SetStance("crouch");
+            if (player.GetField<bool>("isInHeliSniper")) return true;
+            else return false;
+        }
+        private static IEnumerator heliSniper_flyUp(Entity lb, Entity player)
         {
             //lb.SetField("flying", true);
             lb.SetAcceleration(25);
@@ -1647,9 +1703,9 @@ namespace AIZombiesSupreme
             lb.SetField("flying", false);
             lb.SetYawSpeed(100, 50, 50, .2f);
             lb.SetHoverParams(15, 10, 10);
-            OnInterval(100, () => watchHeliViewClamp(lb, player));
+            OnInterval(100, () => heliSniper_watchViewClamp(lb, player));
         }
-        private static bool watchHeliViewClamp(Entity lb, Entity player)
+        private static bool heliSniper_watchViewClamp(Entity lb, Entity player)
         {
                 float yaw = player.GetPlayerAngles().Y;
                 Vector3 lbAngles = lb.Angles;
@@ -1662,33 +1718,27 @@ namespace AIZombiesSupreme
                 if (!lb.GetField<bool>("doneService")) return true;
                 else return false;
         }
-        private static void heliSniper_leaveOnAmmoDepleted(Entity heli, Entity player)
+        private static bool heliSniper_leaveOnAmmoDepleted(Entity heli, Entity player)
         {
-            OnInterval(1000, () =>
-            {
                 if (player.GetAmmoCount("iw5_mk12spr_mp_acog_xmags") == 0)
                 {
                     heli.SetField("heliTime", 0);
                     return false;
                 }
                 return true;
-            });
         }
-        private static void heliSniper_leaveOnPlayerDeath(Entity lb, Entity player)
+        private static bool heliSniper_leaveOnPlayerDeath(Entity lb, Entity player)
         {
-            OnInterval(200, () =>
-            {
                 if (!player.IsAlive)
                 {
                     lb.SetField("hasPassenger", false);
-                    StartAsync(heliLeave(lb));
+                    StartAsync(heliSniper_leave(lb));
                 }
 
                 if (player.IsAlive && !lb.GetField<bool>("doneService")) return true;
                 else return false;
-            });
         }
-        private static IEnumerator heliLeave(Entity lb)
+        private static IEnumerator heliSniper_leave(Entity lb)
         {
             bool hasPassenger = lb.GetField<bool>("hasPassenger");
             Entity owner = lb.GetField<Entity>("owner");
@@ -1820,7 +1870,7 @@ namespace AIZombiesSupreme
             crate.PhysicsLaunchServer(Vector3.Zero, dropImpulse);
             yield return Wait(1);
 
-            lb.SetVehGoalPos(dropLocation + new Vector3(10000, 0, 1800), false);
+            lb.SetVehGoalPos(dropLocation + new Vector3(50000, 0, 1800), true);
             yield return Wait(4);
 
             int curObjID = 31 - mapEdit.getNextObjID();
@@ -1831,11 +1881,11 @@ namespace AIZombiesSupreme
             crate.SetField("range", 75);
             crate.SetField("usabletype", "carePackage");
             crate.SetField("user", crate);
-            crate.SetField("streak", AIZ.rng.Next(9));
+            crate.SetField("streak", AIZ.rng.Next(10));
             crate.SetField("owner", owner);
             mapEdit.makeUsable(crate, "carePackage", 75);
             StartAsync(watchCrateUsage(crate));
-            yield return Wait(5);
+            yield return Wait(3);
 
             lb.FreeHelicopter();
 
@@ -1919,39 +1969,26 @@ namespace AIZombiesSupreme
         {
             crate.Angles = new Vector3(0, AIZ.rng.Next(360), 0);
             crate.CloneBrushModelToScriptModel(mapEdit._airdropCollision);
-            Vector3 dropImpulse = new Vector3(AIZ.rng.Next(5), AIZ.rng.Next(5), AIZ.rng.Next(5));
+            
             int crateIndex = crate.GetField<int>("crateIndex");
-            if (crateIndex == 0)
+            switch (crateIndex)
             {
-                AfterDelay(100, () =>
-                {
-                    crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
-                    crate.Show();
-                });
-            }
-            else if (crateIndex == 1)
-            {
-                AfterDelay(250, () =>
-                {
-                    crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
-                    crate.Show();
-                });
-            }
-            else if (crateIndex == 2)
-            {
-                AfterDelay(400, () =>
-                {
-                    crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
-                    crate.Show();
-                });
-            }
-            else
-            {
-                crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
-                crate.Show();
+                case 0:
+                    StartAsync(startCratePhysics(crate, .15f));
+                    break;
+                case 1:
+                    StartAsync(startCratePhysics(crate, .3f));
+                    break;
+                case 2:
+                    StartAsync(startCratePhysics(crate, .45f));
+                    break;
+                default:
+                    StartAsync(startCratePhysics(crate, 0));
+                    break;
             }
 
             yield return Wait(5);
+
             int curObjID = 31 - mapEdit.getNextObjID();
             Objective_Add(curObjID, "active", crate.Origin, "compass_objpoint_ammo_friendly");
             //Objective_OnEntity(curObjID, crate);
@@ -1960,10 +1997,19 @@ namespace AIZombiesSupreme
             crate.SetField("range", 75);
             crate.SetField("usabletype", "carePackage");
             crate.SetField("user", crate);
-            crate.SetField("streak", AIZ.rng.Next(9));
+            crate.SetField("streak", AIZ.rng.Next(10));
             crate.SetField("owner", owner);
             mapEdit.makeUsable(crate, "carePackage", 75);
             StartAsync(watchCrateUsage(crate));
+        }
+
+        private static IEnumerator startCratePhysics(Entity crate, float delay)
+        {
+            yield return Wait(delay);
+
+            Vector3 dropImpulse = new Vector3(AIZ.rng.Next(5), AIZ.rng.Next(5), AIZ.rng.Next(5));
+            crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
+            crate.Show();
         }
 
         private static IEnumerator watchCrateUsage(Entity crate)
@@ -2018,33 +2064,41 @@ namespace AIZombiesSupreme
             }
         }
         #region mapstreaks
-        /*
         public static void initMapKillstreak()
         {
             switch (AIZ._mapname)
             {
                 case "mp_dome":
                     //mapStreakIcon = "death_nuke";
-                    //mapStreakName = "M.O.A.B.";
-                    mapStreakName = "Tank Strike";
+                    //mapStreakName = AIZ.gameStrings[229];
+                    mapStreakName = AIZ.gameStrings[230];
                     mapStreakIcon = "dpad_killstreak_talon_static";
-                    //mapStreakKills = 650;
+                    mapStreakKills = 650;
 
-                    AIZ.fx_tankExplode = LoadFX("explosions/helicopter_explosion_pavelow");
+                    AIZ.fx_tankExplode = (short)LoadFX("explosions/helicopter_explosion_pavelow");
                     break;
                 case "mp_alpha":
-                    //mapStreakIcon = "";
-                    mapStreakName = "Defcon Trigger System";//Each use lowers defcon number, Defcon 1 triggers multiple package drops
-                    //mapStreakKills = 125;
+                    mapStreakIcon = "group_icon";
+                    mapStreakName = AIZ.gameStrings[231];//Each use lowers defcon number, Defcon 1 triggers multiple package drops
+                    mapStreakKills = 125;
                     level.SetField("defcon", 6);
+                    return;
+                case "mp_burn_ss":
+                    mapStreakIcon = "specialty_precision_airstrike";
+                    mapStreakName = AIZ.gameStrings[232];
+                    mapStreakKills = 850;
+
+                    LoadFX("fire/jet_afterburner_harrier");
+                    LoadFX("smoke/jet_contrail");
+                    LoadFX("misc/aircraft_light_red_blink");
                     return;
             //case "":
             //    //case "":
-            //    mapStreakName = "Flamethrower";
+            //    mapStreakName = AIZ.gameStrings[233];
             //    //case "":
-            //    mapStreakName = "Flash Flood";
+            //    mapStreakName = AIZ.gameStrings[234];
             //    //case "":
-            //    mapStreakName = "Drivable Humvee";
+            //    mapStreakName = AIZ.gameStrings[235];
             //    //case "":
             //    mapStreakName = "";
             //    break;
@@ -2062,183 +2116,23 @@ namespace AIZombiesSupreme
             //return tryUseMoab(player);
             else if (AIZ._mapname == "mp_alpha")
                 decrementDefconLevel(player);
-            //else if (AIZ._mapname == "mp_burn_ss")
-            //spawnA10(player);
+            else if (AIZ._mapname == "mp_burn_ss")
+                if (!mapStreakOut) spawnA10(player);
+                else return false;
             else
             {
                 return false;
             }
 
-            return true;
-        }
-
-        private static bool tryUseMoab(Entity player)
-        {
-            if (AIZ.gameEnded) return false;
-
-            if (nukeInbound)
-            {
-                player.IPrintLnBold("M.O.A.B. already inbound!");
-                return false;
-            }
-            nukeInbound = true;
-            AfterDelay(11000, () => { if (!AIZ.gameEnded) moabDetonation(player); });
-            AIZ.teamSplash("used_nuke", player);
-            player.SetField("ownsMapStreak", false);
             shuffleStreaks(player);
-
-            HudElem nukeTimer = NewTeamHudElem("allies");
-            nukeTimer.X = 0;
-            nukeTimer.Y = 0;
-            nukeTimer.AlignX = HudElem.XAlignments.Center;
-            nukeTimer.AlignY = HudElem.YAlignments.Middle;
-            nukeTimer.HorzAlign = HudElem.HorzAlignments.Center;
-            nukeTimer.VertAlign = HudElem.VertAlignments.Middle;
-            //nukeTimer.SetPoint("CENTER", "CENTER", 0, -75);
-            nukeTimer.Foreground = true;
-            nukeTimer.Alpha = 1;
-            nukeTimer.HideWhenInMenu = true;
-            nukeTimer.Font = HudElem.Fonts.HudBig;
-            nukeTimer.FontScale = 1;
-            nukeTimer.SetText("M.O.A.B. Incoming In: 10");
-            nukeTimer.Color = new Vector3(.7f, 0, 0);
-            nukeTimer.GlowColor = new Vector3(0, 0, .5f);
-            nukeTimer.GlowAlpha = .4f;
-
-            int nukeTime = 10;
-            OnInterval(1000, () =>
-            {
-                if (AIZ.gameEnded) return false;
-                nukeTimer.ChangeFontScaleOverTime(.2f);
-                nukeTimer.FontScale = 1.25f;
-                AfterDelay(200, () =>
-                {
-                    if (nukeTime > 0) nukeTimer.SetText("M.O.A.B. Incoming In: " + nukeTime);
-                    nukeTimer.ChangeFontScaleOverTime(.2f);
-                    nukeTimer.FontScale = 1;
-                });
-                nukeTime--;
-                level.PlaySound("ui_mp_nukebomb_timer");
-                if (nukeTime > 0) return true;
-                else { AfterDelay(250, () => nukeTimer.Destroy()); return false; }
-            });
-
-            foreach (Entity players in Players)
-            {
-                if (!AIZ.isPlayer(players)) continue;
-                AfterDelay(9000, () =>
-                {
-                    if (AIZ.gameEnded) return;
-                    players.VisionSetNakedForPlayer("mpnuke", 5);
-                    players.PlayLocalSound("nuke_explosion");
-                    players.PlayLocalSound("nuke_wave");
-                });
-                AfterDelay(16000, () =>
-                {
-                    if (AIZ.gameEnded) return;
-                    if (players.IsAlive && players.GetField<bool>("isDown")) players.VisionSetNakedForPlayer("cheat_bw", 1);
-                    else players.VisionSetNakedForPlayer(AIZ.vision, 5);
-                });
-            }
-
             return true;
-        }
-        private static void moabDetonation(Entity player)
-        {
-            AfterDelay(1000, () => botUtil.nukeDetonation(player, true));
-
-            Entity check = GetEnt("moabHasDetonated", "targetname");
-            if (check != null) return;
-
-            //Spawn our check ent
-            Entity checker = Spawn("script_origin", Vector3.Zero);
-            checker.TargetName = "moabHasDetonated";
-
-            //Destroy destructibles
-            foreach (Entity e in AIZ.getAllEntitiesWithName("destructible_toy"))
-            {
-                int delay = AIZ.rng.Next(500);
-                AfterDelay(delay, () => e.Notify("damage", e.Health, "", new Vector3(0, 0, 0), new Vector3(0, 0, 0), "MOD_EXPLOSIVE", "", "", "", 0, "frag_grenade_mp"));
-            }
-            foreach (Entity e in AIZ.getAllEntitiesWithName("destructible_vehicle"))
-            {
-                int delay = AIZ.rng.Next(500);
-                AfterDelay(delay, () => e.Notify("damage", 999999, "", new Vector3(0, 0, 0), new Vector3(0, 0, 0), "MOD_EXPLOSIVE", "", "", "", 0, "frag_grenade_mp"));
-            }
-            foreach (Entity e in AIZ.getAllEntitiesWithName("explodable_barrel"))
-            {
-                int delay = AIZ.rng.Next(500);
-                AfterDelay(delay, () => e.Notify("damage", 999999, "", new Vector3(0, 0, 0), new Vector3(0, 0, 0), "MOD_EXPLOSIVE", "", "", "", 0, "frag_grenade_mp"));
-            }
-            foreach (Entity e in AIZ.getAllEntitiesWithName("pipe_shootable"))
-            {
-                int delay = AIZ.rng.Next(500);
-                AfterDelay(delay, () => e.Notify("damage", e.Health, level, Vector3.RandomXY(), new Vector3(0, 0, 0), "MOD_PISTOL_BULLET"));
-            }
-            //Destroy glass
-            int glassCount = GetEntArray("glass", "targetname").GetHashCode();
-            for (int i = 0; i < glassCount; i++)
-                DestroyGlass(i);
-            //Do other misc things
-            foreach (Entity e in AIZ.getAllEntitiesWithName("dynamic_model"))
-            {
-                string model = e.Model;
-                if (model.StartsWith("fence_tarp_"))
-                {
-                    Vector3 origin = e.Origin;
-                    Vector3 angles = e.Angles;
-                    Vector3 forward = AnglesToForward(angles);
-                    Vector3 up = AnglesToUp(angles);
-                    Entity fire = SpawnFX(AIZ.fx_smallFire, origin, forward, up);
-                    TriggerFX(fire);
-                    AfterDelay(3000, () =>
-                    {
-                        fire.Delete();
-                        e.ScriptModelClearAnim();
-                        e.Hide();
-                    });
-                }
-                //Used in EE
-                //else if (model == "machinery_windmill")
-                //{
-                    //e.Call("rotateroll", 80, 2, .25f, .1f);
-                    //e.AfterDelay(1000, (ent) => ent.Call("scriptmodelclearanim"));
-                //}
-                else if (model.Contains("foliage"))
-                    e.Origin -= new Vector3(0, 0, 30);
-                else if (model.Contains("oil_pump_jack"))
-                    e.ScriptModelClearAnim();
-                else if (model == "accessories_windsock_large")
-                {
-                    e.ScriptModelClearAnim();
-                    e.Origin += new Vector3(0, 0, 20);
-                    Entity bounds = Spawn("script_model", e.Origin + new Vector3(15, -7, 0));
-                    Entity bound2 = Spawn("script_model", e.Origin + new Vector3(70, -38, 0));
-                    bounds.SetModel("com_plasticcase_dummy");
-                    bound2.SetModel("com_plasticcase_dummy");
-                    bounds.Hide();
-                    bound2.Hide();
-                    bounds.CloneBrushModelToScriptModel(mapEdit._airdropCollision);
-                    bound2.CloneBrushModelToScriptModel(mapEdit._airdropCollision);
-                    bounds.Angles = e.Angles + new Vector3(0, 90, 0);
-                    bound2.Angles = bounds.Angles;
-                    bounds.EnableLinkTo();
-                    e.LinkTo(bounds);
-                    bound2.LinkTo(bounds);
-                    Vector3 launchImpulse = new Vector3(-400, -250, 10);
-                    bounds.PhysicsLaunchServer(new Vector3(0, 0, 0), launchImpulse);
-                }
-            }
         }
 
         private static void decrementDefconLevel(Entity player)
         {
-            player.SetField("ownsMapStreak", false);
-            shuffleStreaks(player);
-
             int currentDefcon = level.GetField<int>("defcon");
             currentDefcon--;
-            Announcement("Defcon is at level " + currentDefcon);
+            Announcement(string.Format(AIZ.gameStrings[236], currentDefcon));
 
             if (currentDefcon == 3)
             {
@@ -2254,8 +2148,8 @@ namespace AIZombiesSupreme
             {
                 PlaySoundAtPos(Vector3.Zero, "mp_defcon_one");
                 currentDefcon = 5;
-                //doDefconDrop(player);
-                AfterDelay(3000, () => AIZ.teamSplash("callout_top_gun_rank", player));//callout_earned_carepackage
+                StartAsync(doDefconDrop(player));
+                AfterDelay(3000, () => AIZ.teamSplash("callout_earned_carepackage", player));
             }
             else
             {
@@ -2267,14 +2161,32 @@ namespace AIZombiesSupreme
 
             level.SetField("defcon", currentDefcon);
         }
-        private static void doDefconDrop(Entity player)
+        private static IEnumerator doDefconDrop(Entity player)
         {
-            
+            Entity marker = Spawn("script_model", Vector3.Zero);
+            marker.SetModel("tag_origin");
+            marker.Hide();
+            marker.SetField("owner", player);
+
+            //Call two Emergency airdrops
+            Vector3 location = GetGroundPosition(player.Origin.Around(10), 40);
+            callEmergencyAirdrop(marker, location);
+
+            yield return Wait(3);
+
+            marker = Spawn("script_model", Vector3.Zero);
+            marker.SetModel("tag_origin");
+            marker.Hide();
+            marker.SetField("owner", player);
+
+            location = GetGroundPosition(player.Origin.Around(10), 40);
+            callEmergencyAirdrop(marker, location);
         }
 
         private static void spawnTanks(Entity player)
         {
             AIZ.teamSplash("used_remote_tank", player);
+            mapStreakOut = true;
 
             Entity tank1 = SpawnVehicle("vehicle_m1a1_abrams_dmg", "vehicle_tank", "remote_ugv_mp", new Vector3(-3113, 524, -152), new Vector3(3, 8, 7), player);
             tank1.Health = 1000;
@@ -2389,77 +2301,61 @@ namespace AIZombiesSupreme
             tank2.MoveTo(tank2.GetField<Vector3>("perchPos"), 10);
             tank3.MoveTo(tank3.GetField<Vector3>("perchPos"), 6);
 
-            AfterDelay(8050, () =>//Tank1 arrives
-            {
-                tank1Turret.Unlink();
-                tank1Turret.Origin = tank1.GetField<Vector3>("perchPos");
-                tank_searchForTargets(tank1);
-                tank_timer(tank1);
-            });
-            AfterDelay(10050, () =>//Tank2 arrives
-            {
-                tank2Turret.Unlink();
-                tank2Turret.Origin = tank2.GetField<Vector3>("perchPos");
-                tank_searchForTargets(tank2);
-                tank_timer(tank2);
-            });
-            AfterDelay(6050, () =>//Tank3 arrives
-            {
-                tank3Turret.Unlink();
-                tank3Turret.Origin = tank3.GetField<Vector3>("perchPos");
-                tank_searchForTargets(tank3);
-                tank_timer(tank3);
-            });
+            AfterDelay(8050, () => tank_arriveAtPerch(tank1, tank1Turret));
+            AfterDelay(10050, () => tank_arriveAtPerch(tank2, tank2Turret));
+            AfterDelay(6050, () => tank_arriveAtPerch(tank3, tank3Turret));
         }
-        private static void tank_timer(Entity tank)
+        private static void tank_arriveAtPerch(Entity tank, Entity tankTurret)
         {
-            AfterDelay(45000 + AIZ.rng.Next(5000), () =>
-            {
-                if (tank.GetField<bool>("isEngaging"))
-                {
-                    OnInterval(500, () =>
-                    {
-                        if (tank.GetField<bool>("isEngaging")) return true;
-                        else
-                        {
-                            tank.SetField("destroyed", true);
-                            tank_flee(tank);
-                            return false;
-                        }
-                    });
-                }
-                else
-                {
-                    //Log.Debug("Destroying a tank");
-                    tank.SetField("destroyed", true);
-                    //tank_destroyTank(tank);
-                    tank_flee(tank);
-                }
-            });
+            tankTurret.Unlink();
+            tankTurret.Origin = tank.GetField<Vector3>("perchPos");
+            OnInterval(10000, () => tank_searchForTargets(tank));
+            StartAsync(tank_timer(tank));
         }
-        private static void tank_searchForTargets(Entity tank)
+        private static IEnumerator tank_timer(Entity tank)
         {
-            OnInterval(10000, () =>
+            yield return Wait(45 + AIZ.rng.Next(5));
+
+            if (tank.GetField<bool>("isEngaging"))
             {
-                if (tank.GetField<bool>("destroyed")) return false;
-
-                foreach (Entity bot in botUtil.botsInPlay)
-                {
-                    if (!bot.GetField<bool>("isAlive")) continue;
-
-                    Vector3 eye = tank.GetField<Vector3>("eyePos");
-                    Entity botHitbox = bot.GetField<Entity>("hitbox");
-
-                    bool trace = SightTracePassed(eye, botHitbox.Origin + 30, false);
-                    if (!trace) continue;
-
-                    tank_engageTarget(tank, botHitbox);
-                    break;
-                }
-                return true;
-            });
+                OnInterval(500, () => tank_waitForFlee(tank));
+            }
+            else
+            {
+                tank.SetField("destroyed", true);
+                tank_flee(tank);
+            }
         }
-        private static void tank_engageTarget(Entity tank, Entity target)
+        private static bool tank_waitForFlee(Entity tank)
+        {
+            if (tank.GetField<bool>("isEngaging")) return true;
+            else
+            {
+                tank.SetField("destroyed", true);
+                tank_flee(tank);
+                return false;
+            }
+        }
+        private static bool tank_searchForTargets(Entity tank)
+        {
+            if (tank.GetField<bool>("destroyed")) return false;
+
+            foreach (Entity bot in botUtil.botsInPlay)
+            {
+                if (!bot.GetField<bool>("isAlive")) continue;
+
+                Vector3 eye = tank.GetField<Vector3>("eyePos");
+                Entity botHitbox = bot.GetField<Entity>("hitbox");
+
+                bool trace = SightTracePassed(eye, botHitbox.Origin + 30, false);
+                if (!trace) continue;
+
+                StartAsync(tank_engageTarget(tank, botHitbox));
+                break;
+            }
+            return true;
+        }
+        private static IEnumerator tank_engageTarget(Entity tank, Entity target)
         {
             Entity tankTurret = tank.GetField<Entity>("turret");
             tankTurret.Unlink();
@@ -2475,18 +2371,18 @@ namespace AIZombiesSupreme
             tankTurret.AddYaw((int)-(yaw - currentYaw));
             tankTurret.RotateTo(targetAngles, 2);
             tank.SetField("isEngaging", true);
-            AfterDelay(2050, () =>
-            {
-                tankTurret.LinkTo(tank, "body_animate_jnt", new Vector3(0, 0, -44), new Vector3(0, yaw - localYaw, 0));
-                tank.FireWeapon("origin_animate_jnt", tank, Vector3.Zero);
-                tankTurret.Angles = targetAngles;
-                Vector3 start = tankTurret.GetTagOrigin("tag_flash");
-                Vector3 angles = AnglesToForward(tankTurret.Angles);
-                Entity missile = MagicBullet(tank.GetField<string>("weapon"), start, tankTurret.Origin + angles * 7000, tank);
-                missile.SetTargetEnt(target);
-                missile.SetFlightModeTop();
-                tank.SetField("isEngaging", false);
-            });
+
+            yield return Wait(2.05f);
+
+            tankTurret.LinkTo(tank, "body_animate_jnt", new Vector3(0, 0, -44), new Vector3(0, yaw - localYaw, 0));
+            tank.FireWeapon("origin_animate_jnt", tank, Vector3.Zero);
+            tankTurret.Angles = targetAngles;
+            Vector3 start = tankTurret.GetTagOrigin("tag_flash");
+            Vector3 angles = AnglesToForward(tankTurret.Angles);
+            Entity missile = MagicBullet(tank.GetField<string>("weapon"), start, tankTurret.Origin + angles * 7000, tank);
+            missile.SetTargetEnt(target);
+            missile.SetFlightModeTop();
+            tank.SetField("isEngaging", false);
         }
         private static void tank_flee(Entity tank)
         {
@@ -2494,19 +2390,211 @@ namespace AIZombiesSupreme
             missile.OnNotify("explode", (m, pos) =>
             {
                 if (Utilities.isEntDefined(tank) && tank.TargetName == "vehicle_tank")
-                    tank_destroyTank(tank);
+                    tank_destroyTank(tank, pos.As<Vector3>());
             });
         }
-        private static void tank_destroyTank(Entity tank)
+        private static void tank_destroyTank(Entity tank, Vector3 pos)
         {
             //tank.PlaySound("");
-            PlayFX(AIZ.fx_tankExplode, tank.Origin);
+            PlayFX(AIZ.fx_tankExplode, pos);
             tank.GetField<Entity>("turret").Delete();
             tank.ClearField("turret");
             tank.FreeVehicle();
             tank.Delete();
+
+            mapStreakOut = false;
         }
-        */
+
+        private static void spawnA10(Entity owner)
+        {
+            //Sanity check
+            if (AIZ._mapname != "mp_burn_ss") return;
+
+            mapStreakOut = true;
+
+            Entity a10 = SpawnHelicopter(owner, new Vector3(-25000, 0, heliHeight), Vector3.Zero, "harrier_mp", "vehicle_a10_warthog");//SpawnPlane(owner, "script_model", new Vector3(-15000, 0, heliHeight), "compass_objpoint_reaper_friendly", "compass_objpoint_reaper_enemy");
+
+            int objID = mapEdit.getNextRealObjID();
+            mapEdit._realObjIDList[objID] = true;
+            a10.SetField("realObjID", objID);
+
+            a10.SetField("owner", owner);
+            a10.SetVehicleTeam("allies");
+            a10.SetField("mapCenter", new Vector3(-800, -30, heliHeight));
+            a10.SetField("state", "strafing");
+            a10.SetField("timeLeft", 90);
+            a10.SetSpeed(300, 80, 0);
+            a10.SetSpeedImmediate(300);
+            a10.SetCanDamage(false);
+            a10.SetMaxPitchRoll(0, 75);
+            a10.SetYawSpeed(50, 25, 20, .5f);
+            a10.SetVehWeapon("ac130_25mm_mp");
+            //owner.PlaySound("US_1mc_use_a10");
+            owner.PlaySound("US_1mc_use_strafe");
+            AIZ.teamSplash("used_a10_support", owner);
+
+            StartAsync(doA10FlyBy(a10));
+            StartAsync(playA10FX(a10));
+            OnInterval(50, () => a10_targeting(a10));
+            OnInterval(50, () => a10_monitorGoalPos(a10));
+            OnInterval(1000, () => a10_timer(a10));
+        }
+        private static IEnumerator doA10FlyBy(Entity a10)
+        {
+            yield return WaitForFrame();
+            a10.SetVehGoalPos(a10.GetField<Vector3>("mapCenter"), false);
+        }
+        private static bool a10_targeting(Entity a10)
+        {
+            if (a10.GetField<string>("state") != "strafing") return true;
+            if (a10.HasField("target")) return true;
+
+            Vector3 gunTag = a10.GetTagOrigin("tag_gun");
+            foreach (Entity bot in botUtil.botsInPlay)
+            {
+                if (!bot.HasField("isAlive")) continue;
+                if (!bot.GetField<bool>("isAlive")) continue;
+
+                Entity botHitbox = bot.GetField<Entity>("hitbox");
+                if (a10.Origin.DistanceTo2D(botHitbox.Origin) > 6000) continue;
+
+                bool trace = SightTracePassed(gunTag, botHitbox.Origin, false, botHitbox, a10);
+                if (!trace) continue;
+
+                a10.SetField("target", bot);
+                a10.SetTurretTargetEnt(bot);
+                OnInterval(100, () => a10_fireWeapon(a10, bot));
+                a10.PlayLoopSound("pavelow_mg_loop");//Start our firing sound here
+                break;//Found a target, leave this loop to target that bot only
+            }
+
+            if (!a10.HasField("owner")) return false;
+            return true;
+        }
+        private static bool a10_monitorGoalPos(Entity a10)
+        {
+            if (!a10.HasField("owner")) return false;
+            if (a10.GetField<string>("state") != "strafing") return true;
+
+            if (a10.Origin.DistanceTo2D(a10.GetField<Vector3>("mapCenter")) < 256)
+                StartAsync(a10_uturn(a10));
+
+            return true;
+        }
+        private static IEnumerator a10_uturn(Entity a10)
+        {
+            Vector3 right = AnglesToRight(new Vector3(a10.Angles.X, a10.Angles.Y, 0));
+            if (RandomInt(100) < 50) right *= -1;
+            Vector3 turnDirector = a10.GetField<Vector3>("mapCenter") + (right * 14000);
+
+            a10.SetVehGoalPos(turnDirector, false);
+
+            yield return Wait(2);
+
+            if (!a10.HasField("owner")) yield break;//In case it left during this part of the uturn
+
+            a10.SetField("state", "uturn");
+            turnDirector.Y -= (right.Y * 4000);
+            a10.SetVehGoalPos(turnDirector, false);
+
+            yield return Wait(3);
+
+            //a10.SetSpeedImmediate(300);
+            a10.SetVehGoalPos(a10.GetField<Vector3>("mapCenter"), false);
+            a10.SetField("state", "strafing");
+        }
+        private static IEnumerator a10_leave(Entity a10)
+        {
+            while (a10.GetField<string>("state") != "strafing")
+                yield return Wait(.5f);
+
+            a10.ClearField("owner");
+
+            Vector3 forward = AnglesToForward(a10.Angles);
+            a10.SetVehGoalPos(a10.Origin + (forward * 50000), false);
+
+            yield return Wait(7);
+
+            a10.ClearField("state");
+            a10.ClearField("mapCenter");
+            a10.ClearField("timeLeft");
+            a10.FreeHelicopter();
+            a10.Delete();
+            mapStreakOut = false;
+        }
+        private static bool a10_fireWeapon(Entity a10, Entity target)
+        {
+            if (!a10.HasField("owner")) return false;
+            if (!a10.HasField("target")) return false;
+
+            if (!target.GetField<bool>("isAlive"))
+            {
+                a10.ClearField("target");//Target mysteriously died
+                a10.ClearTurretTarget();
+                a10.StopLoopSound();//Stop our fire sound
+                return false;
+            }
+
+            Vector3 gunTag = a10.GetTagOrigin("tag_gun");
+            MagicBullet("ac130_25mm_mp", gunTag, target.Origin, a10.GetField<Entity>("owner"));
+            //a10.FireWeapon("tag_gun", target);
+
+            bool trace = SightTracePassed(gunTag, target.Origin, false, target, a10);
+            if (!trace)
+            {
+                a10.ClearField("target");//Lost sight of the target
+                a10.ClearTurretTarget();
+                a10.StopLoopSound();//Stop our fire sound
+                return false;
+            }
+            return true;
+        }
+        private static bool a10_timer(Entity a10)
+        {
+            if (!a10.HasField("owner")) return false;
+            a10.SetField("timeLeft", a10.GetField<int>("timeLeft") - 1);
+            //Log.Write(LogLevel.All, "Time is {0}", uav.GetField<int>("timeLeft"));
+            if (a10.GetField<int>("timeLeft") > 0 && a10.GetField<Entity>("owner").IsAlive) return true;
+            else
+            {
+                StartAsync(a10_leave(a10));
+                return false;
+            }
+        }
+        private static IEnumerator playA10FX(Entity a10)
+        {
+            yield return Wait(.2f);
+
+            int fx_afterburner = LoadFX("fire/jet_afterburner_harrier");
+            int fx_contrail = LoadFX("smoke/jet_contrail");
+            int fx_tail = LoadFX("misc/aircraft_light_red_blink");
+
+            if (fx_contrail != 0)
+            {
+                PlayFXOnTag(fx_contrail, a10, "tag_right_wingtip");
+                PlayFXOnTag(fx_contrail, a10, "tag_left_wingtip");
+            }
+
+            yield return Wait(.2f);
+
+            if (fx_afterburner != 0)
+            {
+                PlayFXOnTag(fx_afterburner, a10, "tag_engine_right");
+                PlayFXOnTag(fx_afterburner, a10, "tag_engine_left");
+            }
+
+            yield return Wait(.2f);
+            PlayFXOnTag(AIZ.fx_rayGun, a10, "tag_left_wingtip");
+            yield return Wait(.2f);
+            PlayFXOnTag(AIZ.fx_rayGunUpgrade, a10, "tag_right_wingtip");
+
+            if (fx_tail == 0) yield break;
+
+            yield return Wait(.2f);
+            PlayFXOnTag(fx_tail, a10, "tag_left_tail");
+            yield return Wait(.2f);
+            PlayFXOnTag(fx_tail, a10, "tag_right_tail");
+        }
         #endregion
     }
 }

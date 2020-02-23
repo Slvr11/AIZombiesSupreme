@@ -1,0 +1,328 @@
+Humans Defeated The Zombies!
+Humans Survived!
+Good Job Humans!
+Humans Stayed Alive!
+Human Face: :D!
+Amazing! Humans Live On!
+Great Job Humans!
+Good Job, Get Ready For The Next Attack!
+Zombies Are Such Perverts... Humans FTW!
+Humans: 1, Zombies: 0
+Humans Win Bitches!
+Victory!!!
+Enemy Down!!!
+Easy Peasy!
+You must be running AIZombies Supreme on Team Deathmatch!
+The current max players for AIZombies can only be 8 or below. The current setting is {0}. It has been set to 8.
+^1AIZombies Supreme Made by ^2Slvr99
+^2Humans
+^1Wait until the end of the round to spawn!
+Survive {0} waves.
+Get ready for the attack in:
+Next Round In: 
+^2Welcome {0}!\n^1AIZombies Supreme {3}\n^3Map: {1}\n^2Made By Slvr99\n^5Survive {2} Waves.
+^1{0} ^1needs to be revived!
+^1Failed to revive 
+^1You have died. Wait until the next round to respawn.
+^1{0} ^1has been killed.
+Configuration file for AIZombies was not found! Creating one...
+Max Health was set to an incorrect value in the cfg!, Set to default ({0})
+Max Juggernog Health was set to an incorrect value in the cfg!, Set to default ({0})
+Bot Health was set to an incorrect value in the cfg!, Set to default ({0})
+Crawler Health was set to an incorrect value in the cfg!, Set to default ({0})
+Boss Health was set to an incorrect value in the cfg!, Set to default ({0})
+Bot Health Factor was set to an incorrect value in the cfg!, Set to default ({0})
+Bot Damage was set to an incorrect value in the cfg!, Set to default ({0})
+Perk Limit was set to an incorrect value in the cfg!, Set to default ({0})
+Streets of Death
+Stormy Outbreak
+Rundown Village
+Oil Refinery
+Desert Outpost
+Abandoned Subway
+Construction Site Of Hell
+Demolished Underpass
+Abandoned Road Of Hell
+Docked Death
+Death Alley
+Bone Appetite
+Storage Unit Of Hell
+Seaside Hotel Of Hell
+Car Lot Of Pain
+Big Black Death
+El Brote
+Wartorn
+Under Construction
+Death In Progress
+Shipwrecked
+Dead Aqueduct
+Silla Cement
+Oceanside Attack
+Sanctuary Of Hell
+Paradise
+Rest Site Of Hell
+Death Row
+Pandemic Bridge
+Undead Farm
+Hideout of Hell
+Shantytown
+Oil Rig
+Death Avenue
+Trapped Canyon
+The Pier
+^1Unknown Map!
+ Please do not impersonate the developer.
+Server gametype name search was cancelled for an unknown reason.
+There was an error setting the server gametype name!: 
+There was an error setting the server gametype name: No addresses found!
+Gametype name search was cancelled for an unknown reason.
+There was an error setting the gametype name!: 
+There was an error setting the gametype name: No addresses found!
+
+
+Weapon patch search was cancelled for an unknown reason! This may cause bugs to occur for certain weapons.
+There was an error finding weapon patch locations: 
+Unable to set custom gametype name in server browser!
+Could not find weapon data for {0}! Please report this error to Slvr99
+
+
+Unable to set custom gametype name.
+Unable to restore the custom gamemode string! This may result in a server crash when the map changes!
+All third party scripts have been unloaded from this server due to a conflict with AIZombies.
+There was an error contacting the update check server!: {0}
+There was an error contacting the update check server!: No response from the server.
+There is an update for AIZombies available! Downloading version {0} now...
+There was an error downloading the update from the server!: {0}
+There was an error replacing the old AIZombies file! Make sure the file is not read-only or is opened somewhere else.
+Download completed! The updates will take effect once the current game ends.
+Extra Cash!
+Extra Bonus Points!
+Random Perk!
+No bot spawns available! Please have at least one \"zombiespawn\" in your map file.
+^1No bot spawns available! Check console for details
+More health
+Sprint faster and longer
+Reload faster
+An extra weapon slot
+Faster rate of fire
+Faster moving while ADS
+Automatically be revived shortly after going down\n+ Revive your team faster
+Scavenge Free Ammo
+Lockdown
+Bootleg
+Mission
+Carbon
+Dome
+Downturn
+Hardhat
+Interchange
+Fallen
+Bakaara
+Resistance
+Arkaden
+Outpost
+Seatown
+Underground
+Village
+Piazza
+Liberation
+Black Box
+Overwatch
+Aground
+Erosion
+Foundation
+Getaway
+Sanctuary
+Oasis
+Lookout
+Terminal
+Intersection
+Vortex
+U-Turn
+Decommission
+Offshore
+Parish
+Gulch
+Once peaceful streets overrun by undead
+Stormy town taken over by the undead
+A rundown village taken over\nby the undead
+A once lively oil refinery
+An abandoned outpost in the desert
+The aftermath of a dangerous mistake
+A small construction site unfinished
+A destroyed freeway\nresulting from an outbreak
+An abandoned russian ghost town
+An african city hit by the undead
+Parisian district not safe anymore
+German mall robbed by the undead
+Siberian outpost evacuated\ndue to the outbreak
+A seaside town not safe\nfrom the undead
+Subway station used as an\nevacuation route
+African village ridden\nwith a dangerous disease
+A spanish town infected by muertos
+A military base built in a park\nfor protection against the undead
+Crash site of an airborne\nvirus attack
+A skyscraper abandoned due\nto the outbreak
+Shipwreck caused by a virus at sea
+Aqueduct contaminated by the undead
+Cement factory overtaken by the undead
+Vacation spot that turned\ninto a nightmare
+A sanctuary that was broken from\nit's purity by the undead
+An oasis that got overrun by undead
+A rest repo that's useful for\nanything other than rest
+A russian airport overtaken by the undead
+A freeway in the centre on the attacks
+Abandoned farm hit by\nmore than one problem
+Desert freeway unsafe from the undead
+A shipwreck near a town\nthat has been infected
+An oil rig overrun by\nmore than juggernauts
+A fun town that was\novertaken by undead
+Desert gulch thriving with undead
+Money: $
+Bonus Points:
+Zombies: 
+Power is not activated
+Boss Wave Survived!\n^320 Second Intermission
+Completed Boss Wave!
+Crawler Wave Survived!\n^320 Second Intermission
+Max Ammo Awarded!
+Wave 
+ Survived!\n^320 Second Intermission
+Power Activated By
+Power has been temporarily activated for {0} seconds
+Power is not activated
+Zombies ate the humans
+Victory!
+Defeat!
+Win
+Lose
+Humans Survived for
+ Minutes
+ Seconds
+Waves Survived: 
+We Won This Fight!
+Zombies Won This Fight
+Death Machine!
+Insta-Kill!
+Double Points!
+Max Ammo!
+Nuke!
+Fire Sale!
+Freezer!
+^5Random
+Vote using [{+actionslot 4}], [{+actionslot 5}], and [{+actionslot 6}] for the respective maps!
+Vote for the next map!
+Next Round In: {0}
+Map Killstreak
+1000 Kill Streak!
+Permanent Bot Achieved!
+^3{0} ^7ready for usage!
+
+Airspace too crowded.
+Cannot call in Heli Sniper while teleporting
+Cannot call in Heli Sniper here
+ not available.
+Nuke already inbound!
+Nuke Incoming In: {0}
+
+
+Press ^3[{vote no}] ^7to re-route the drone
+M.O.A.B.
+Tank Barrage
+Defcon Trigger System
+A-10 Support
+Flamethrower
+Flash Flood
+Drivable Humvee
+Defcon is at level {0}
+A waypoint had no visible links! Deleting waypoint...
+ Gifted $500 to {0}!
+ Recieved $500 from {0}!
+^1Not enough money for a Random Weapon. Need ^2$10
+^1Not enough money for a Random Weapon. Need ^2$950
+Random Weapon!
+Weapon Upgraded!
+^1Gambler is already in use!
+^1You may only use the gambler once per round!
+Gambler!
+^1You've won {0}.
+^2Your results will display in 10 seconds.
+^2You've won {0}!
+^1You've lost {0}!
+^2Double Health for 30 seconds!
+Double Health over!
+^2Infinite Health for 30 seconds!
+Infinite Health over!
+^2You have 1/2 chance for Max Ammo!
+^2You've won the Max Ammo!
+^1No Max Ammo.
+^1God decides if you live or die in 5 seconds
+^2You live.
+^1Not enough money for Ammo. Need ^2$
+Ammo!
+Random Killstreak!
+Current Balance: ${0}
+Bank Withdraw
+Elevator!
+Juggernog
+Stamin-Up
+Speed Cola
+Mule Kick
+Double Tap
+Stalker Soda
+Quick Revive Pro
+Scavenge-Aid
+Power!
+Power has been activated
+Opened Door!
+Press ^3[{+activate}] ^7to gift $^2500 ^7to 
+Press ^3{1} ^7to open the door [Cost: {0}]
+Press ^3[{+activate}] ^7to trade Weapons: 
+Press ^3[{+activate}] ^7for a Random Weapon [Cost: 10]
+Press ^3[{+activate}] ^7for a Random Weapon [Cost: 950]
+^1Power must be activated!
+Press ^3[{+activate}] ^7to take ^2your new upgraded weapon
+Press ^3[{+activate}] ^7to upgrade your ^1Current Weapon ^7[Cost: 5000]
+Press ^3[{+activate}] ^7to use the Gambler [Cost: 1000]
+Press ^3[{+activate}] ^7to buy a random killstreak [Cost: 200 ^5Bonus Points^7]
+The teleporter is cooling down.
+^1You must link the teleporter first!
+Press ^3[{+activate}] ^7to teleport
+Press ^3[{+activate}] ^7to link the teleporter
+Press ^3[{+activate}] ^7to use the elevator [Cost: 500]
+Press ^3[{+activate}] ^7to withdraw from the ATM [Amount: 1000] [Cost: 100]\n\n                  Press ^3[{vote yes}] ^7to deposit to the ATM [Cost: 1000]
+You already have {0}!
+Press ^3{2} ^7to buy {0} [Cost: {1}]
+You may only carry {0} perks!
+Press ^3[{+activate}] ^7to activate Power [Cost: 10000]
+Hold ^3[{+activate}] ^7for Explosive Ammo
+Hold ^3[{+activate}] ^7to board the Heli
+ is already being revived!
+Hold ^3[{+activate}] ^7to revive 
+Ammo
+Missile
+Sentry Gun
+Vision Restorer
+Power Surge
+Deployable Explosive Ammo
+M.O.A.B.
+Littlebird Drone
+Heli Sniper
+Grenade Launcher Turret
+Double Points
+Insta-Kill
+Nuke
+Death Machine
+Airstrike
+Hold ^3[{+activate}] ^7for {0}
+Weapon
+Press ^3[{+activate}] ^7to wash away your sins.
+Press ^3[{+activate}] ^7for {0} ^7[Cost: {1}]
+Press ^3[{+activate}] ^7for 
+Press ^3[{+activate}] ^7for Ammo [Cost: {0}]
+Press ^3[{+actionslot 3}] ^7to equip P.E.S.
+^5P.E.S. Active.
+^5Please activate P.E.S.
+Error loading mapedit for map {0}: {1}
+Unknown MapEdit Entry {0}... ignoring
+All Perks Awarded!

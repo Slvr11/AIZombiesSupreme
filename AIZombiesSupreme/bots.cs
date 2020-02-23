@@ -18,8 +18,8 @@ namespace AIZombiesSupreme
 
             if (botSpawns.Count == 0)
             {
-                Utilities.PrintToConsole("No bot spawns available! Please have at least one \"zombiespawn\" in your map file.");
-                Announcement("^1No bot spawns available! Check console for details");
+                Utilities.PrintToConsole(AIZ.gameStrings[100]);
+                Announcement(AIZ.gameStrings[101]);
                 return false;
             }
 
@@ -84,8 +84,8 @@ namespace AIZombiesSupreme
 
             if (botSpawns.Count == 0)
             {
-                Utilities.PrintToConsole("No bot spawns available! Please have at least one \"zombiespawn\" in your map file.");
-                Announcement("^1No bot spawns available! Check console for details");
+                Utilities.PrintToConsole(AIZ.gameStrings[100]);
+                Announcement(AIZ.gameStrings[101]);
                 return false;
             }
 
@@ -191,7 +191,11 @@ namespace AIZombiesSupreme
                     if (botOrigin.DistanceTo(playerOrigin) > 600) continue;
 
                     Vector3 playerHeadTag = p.GetTagOrigin("j_head");
-                    if (SightTracePassed(botHeadTag, playerHeadTag, false, botHitbox))
+                    bool trace;
+                    if (!isCrawler && !isBoss)
+                        trace = SightTracePassed(botHeadTag, playerHeadTag, false, botHitbox, ai.GetField<Entity>("head"), ai.GetField<Entity>("headHitbox"));
+                    else trace = SightTracePassed(botHeadTag, playerHeadTag, false, botHitbox);
+                    if (trace)
                     {
                         //Log.Write(LogLevel.All, "Traced {0}", p.Name);
                         //if (target != null)

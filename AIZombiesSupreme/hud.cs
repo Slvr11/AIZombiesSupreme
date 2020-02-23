@@ -8,7 +8,7 @@ namespace AIZombiesSupreme
     public class hud : BaseScript
     {
         public static uint EMPTime = 0;
-        private static readonly string[] PerkDescs = { "More health", "Sprint faster and longer", "Reload faster", "An extra weapon slot", "Faster rate of fire", "Faster moving while ADS", "Automatically be revived shortly after going down\n+ Revive your team faster", "Scavenge Free Ammo" };
+        private static readonly string[] PerkDescs = { AIZ.gameStrings[102], AIZ.gameStrings[103], AIZ.gameStrings[104], AIZ.gameStrings[105], AIZ.gameStrings[106], AIZ.gameStrings[107], AIZ.gameStrings[108], AIZ.gameStrings[109] };
         public static bool powerBox = false;
         private static bool killHud = false;
         private static bool doubleHud = false;
@@ -30,18 +30,8 @@ namespace AIZombiesSupreme
         "mp_radar", "mp_seatown", "mp_underground", "mp_village", "mp_italy", "mp_park", "mp_morningwood", "mp_overwatch", "mp_aground_ss",
         "mp_courtyard_ss", "mp_cement", "mp_hillside_ss", "mp_meteora", "mp_qadeem", "mp_restrepo_ss", "mp_terminal_cls", "mp_crosswalk_ss",
         "mp_six_ss", "mp_burn_ss", "mp_shipbreaker", "mp_roughneck", "mp_nola", "mp_moab"};
-        private static readonly string[] mapNames = new string[36]{"-", "Lockdown", "Bootleg", "Mission", "Carbon", "Dome"
-        , "Downturn", "Hardhat", "Interchange", "Fallen", "Bakaara", "Resistance", "Arkaden",
-        "Outpost", "Seatown", "Underground", "Village", "Piazza", "Liberation", "Black Box", "Overwatch", "Aground",
-        "Erosion", "Foundation", "Getaway", "Sanctuary", "Oasis", "Lookout", "Terminal", "Intersection",
-        "Vortex", "U-Turn", "Decommission", "Offshore", "Parish", "Gulch"};
-        private static readonly string[] mapDesc = new string[36]{"-", "Once peaceful streets overrun by undead", "Stormy town taken over by the undead", "A rundown village taken over\nby the undead", "A once lively oil refinery", "An abandoned outpost in the desert"
-        , "The aftermath of a dangerous mistake", "A small construction site unfinished", "A destroyed freeway\nresulting from an outbreak", "An abandoned russian ghost town", "An african city hit by the undead", "Parisian district not safe anymore", "German mall robbed by the undead", 
-        "Siberian outpost evacuated\ndue to the outbreak", "A seaside town not safe\nfrom the undead", "Subway station used as an\nevacuation route", "African village ridden\nwith a dangerous disease", "A spanish town infected by muertos"
-        , "A military base built in a park\nfor protection against the undead", "Crash site of an airborne\nvirus attack", "A skyscraper abandoned due\nto the outbreak", "Shipwreck caused by a virus at sea",
-        "Aqueduct contaminated by the undead", "Cement factory overtaken by the undead", "Vacation spot that turned\ninto a nightmare", "A sanctuary that was broken from\nit's purity by the undead"
-        , "An oasis that got overrun by undead", "A rest repo that's useful for\nanything other than rest", "A russian airport overtaken by the undead", "A freeway in the centre on the attacks",
-        "Abandoned farm hit by\nmore than one problem", "Desert freeway unsafe from the undead", "A shipwreck near a town\nthat has been infected", "An oil rig overrun by\nmore than juggernauts", "A fun town that was\novertaken by undead", "Desert gulch thriving with undead"};
+        public static readonly string[] mapNames = new string[36];
+        public static readonly string[] mapDesc = new string[36];
         //private static int mapSelection = 0;
         private static byte[] mapVotes = new byte[3]{0, 0, 0};
         private static byte[] mapLists = new byte[3]{0, 0, 0};
@@ -198,7 +188,7 @@ namespace AIZombiesSupreme
             scoreHud.Color = new Vector3(0, 0.9f, 0);
             scoreHud.GlowColor = new Vector3(0, 0.9f, 0);
             scoreHud.GlowAlpha = 0.5f;
-            scoreHud.SetText("Money: $");
+            scoreHud.SetText(AIZ.gameStrings[180]);
             scoreHud.Sort = 10;
             HudElem scoreNumber = HudElem.CreateFontString(player, HudElem.Fonts.HudSmall, 1);
             scoreNumber.Parent = scoreHud;
@@ -224,7 +214,7 @@ namespace AIZombiesSupreme
             pointHud.Color = new Vector3(0, 0.85f, 0.85f);
             pointHud.GlowColor = new Vector3(0, 0.85f, 0.85f);
             pointHud.GlowAlpha = 0.5f;
-            pointHud.SetText("Bonus Points:");
+            pointHud.SetText(AIZ.gameStrings[181]);
             pointHud.Sort = 11;
             HudElem pointNumber = HudElem.CreateFontString(player, HudElem.Fonts.HudSmall, 1);
             pointNumber.Parent = pointHud;
@@ -336,7 +326,7 @@ namespace AIZombiesSupreme
             zombieCounter.Archived = true;
             zombieCounter.Color = new Vector3(1, 0.5f, 0);
             zombieCounter.Alpha = 1;
-            zombieCounter.SetText("Zombies: 0");
+            zombieCounter.SetText(AIZ.gameStrings[182] + "0");
             zombieCounter.Sort = 14;
             botUtil.onBotUpdate += updateZombieCounterForPlayer;
 
@@ -352,7 +342,7 @@ namespace AIZombiesSupreme
                     powerHud.Archived = true;
                     powerHud.Alpha = 1;
                     powerHud.Color = new Vector3(0.9f, 0, 0);
-                    powerHud.SetText("Power is not activated");
+                    powerHud.SetText(AIZ.gameStrings[183]);
                     //player.SetField("hud_power", new Parameter(powerHud));
                     powerHud.Sort = 12;
                 }
@@ -361,7 +351,7 @@ namespace AIZombiesSupreme
 
         private static void updateZombieCounterForPlayer()
         {
-            zombieCounter.SetText("Zombies: " + botUtil.botsInPlay.Count);
+            zombieCounter.SetText(AIZ.gameStrings[182] + botUtil.botsInPlay.Count);
         }
 
         private static IEnumerator OnRoundChange()
@@ -493,8 +483,8 @@ namespace AIZombiesSupreme
                 aizHUD[3].SetText("");
                 //scorePopup(player, 0);
                 //scoreMessage(player, "");
-                aizHUD[4].SetText("Money: $");
-                aizHUD[5].SetText("Bonus Points:");
+                aizHUD[4].SetText(AIZ.gameStrings[180]);
+                aizHUD[5].SetText(AIZ.gameStrings[181]);
                 aizHUD[6].SetText((string)aizHUD[6].GetField("text"));
                 aizHUD[7].SetText("");
                 aizHUD[8].SetText("");
@@ -505,7 +495,7 @@ namespace AIZombiesSupreme
                 {
                     //Log.Write(LogLevel.All, "Has Intro");
                     HudElem h = player.GetField<HudElem>("hud_intro");
-                    h.SetText(string.Format("^2Welcome {0}!\n^1AIZombies Supreme {3}\n^3Map: {1}\n^2Made By Slvr99\n^5Survive {2} Waves.",
+                    h.SetText(string.Format(AIZ.gameStrings[22],
                             player.Name, AIZ.getZombieMapname(), roundSystem.totalWaves, AIZ.version));
                 }
                 //perk earns
@@ -522,18 +512,18 @@ namespace AIZombiesSupreme
                 {
                     Log.Write(LogLevel.All, "Has Hint");
                     HudElem h = player.GetField<HudElem>("hud_lbHint");
-                    h.SetText("Press ^3[{vote no}] ^7to re-route the drone");
+                    h.SetText(AIZ.gameStrings[228]);
                 }
                 */
             }
 
             //Clear server hud
-            zombieCounter.SetText("Zombies: " + botUtil.botsInPlay.Count);
+            zombieCounter.SetText(AIZ.gameStrings[182] + botUtil.botsInPlay.Count);
 
             if (!AIZ.isHellMap)
             {
-                if (powerBox) powerHud.SetText("Power has been activated");
-                else if (!powerBox && AIZ.tempPowerActivated) powerHud.SetText(string.Format("Power has been temporarily activated for {0} seconds", EMPTime));
+                if (powerBox) powerHud.SetText(AIZ.gameStrings[275]);
+                else if (!powerBox && AIZ.tempPowerActivated) powerHud.SetText(string.Format(AIZ.gameStrings[191], EMPTime));
                 else powerHud.SetText("Power has not been activated");
             }
 
@@ -542,14 +532,14 @@ namespace AIZombiesSupreme
             if (roundEnd != null)
             {
                 //Log.Write(LogLevel.All, "Round End");
-                if (roundSystem.isBossWave) roundEnd.SetText("Boss Wave Survived!\n^320 Second Intermission");
-                else if (roundSystem.isCrawlerWave) roundEnd.SetText("Crawler Wave Survived!\n^320 Second Intermission");
-                else roundEnd.SetText("Wave " + roundSystem.Wave + " Survived!\n^320 Second Intermission");
+                if (roundSystem.isBossWave) roundEnd.SetText(AIZ.gameStrings[184]);
+                else if (roundSystem.isCrawlerWave) roundEnd.SetText(AIZ.gameStrings[186]);
+                else roundEnd.SetText(AIZ.gameStrings[188] + roundSystem.Wave + AIZ.gameStrings[189]);
             }
             if (roundStart != null)
             {
                 //Log.Write(LogLevel.All, "Round Start");
-                roundStart.SetText("Wave " + roundSystem.Wave);
+                roundStart.SetText(AIZ.gameStrings[188] + roundSystem.Wave);
             }
             if (intermission != null)
             {
@@ -865,6 +855,12 @@ namespace AIZombiesSupreme
 
         public static void scorePopup(Entity player, int amount)
         {
+            if (Entity.Level.HasField("isBlackFriday") && amount < 0)
+            {
+                amount /= 2;
+                player.SetField("cash", player.GetField<int>("cash") + Abs(amount));//Yeah I know it's lazy but who gives a fuck =P
+            }
+
             if (!player.HasField("aizHud_created")) return;
             HudElem score = player.GetField<HudElem>("hud_scorePop");
             HudElem scoreLine = player.GetField<HudElem>("hud_scoreLine");
@@ -949,7 +945,7 @@ namespace AIZombiesSupreme
                         if (instant)
                             setPerkHudSlot(player, i, Perk);
                         else
-                            AfterDelay(9000, () => setPerkHudSlot(player, i, Perk));
+                            AfterDelay(9050, () => setPerkHudSlot(player, i, Perk));
                         player.SetField("perk" + i + "HudDone", true);
                         break;
                     }
@@ -1042,7 +1038,7 @@ namespace AIZombiesSupreme
             roundStart.GlowColor = new Vector3(0, 0, 1);
             roundStart.Alpha = 0;
             roundStart.Archived = true;
-            roundStart.SetText("Wave " + roundSystem.Wave);
+            roundStart.SetText(AIZ.gameStrings[188] + roundSystem.Wave);
             roundStart.FadeOverTime(1);
             roundStart.Alpha = 1;
 
@@ -1067,27 +1063,27 @@ namespace AIZombiesSupreme
             roundEnd.Alpha = 0;
             if (roundSystem.isBossWave)
             {
-                roundEnd.SetText("Boss Wave Survived!\n^320 Second Intermission");
+                roundEnd.SetText(AIZ.gameStrings[184]);
                 foreach (Entity players in Players)
                 {
                     if (!players.IsAlive) continue;
                     players.SetField("cash", players.GetField<int>("cash") + 1000);
                     scorePopup(players, 1000);
-                    scoreMessage(players, "Completed Boss Wave!");
+                    scoreMessage(players, AIZ.gameStrings[185]);
                     AIZ.giveMaxAmmo(players);
                 }
             }
             else if (roundSystem.isCrawlerWave)
             {
-                roundEnd.SetText("Crawler Wave Survived!\n^320 Second Intermission");
+                roundEnd.SetText(AIZ.gameStrings[186]);
                 foreach (Entity players in Players)
                 {
                     if (!players.IsAlive) continue;
                     AIZ.giveMaxAmmo(players);
-                    scoreMessage(players, "Max Ammo Awarded!");
+                    scoreMessage(players, AIZ.gameStrings[187]);
                 }
             }
-            else roundEnd.SetText("Wave " + roundSystem.Wave + " Survived!\n^320 Second Intermission");
+            else roundEnd.SetText(AIZ.gameStrings[188] + roundSystem.Wave + AIZ.gameStrings[189]);
             roundEnd.FadeOverTime(1);
             roundEnd.Alpha = 1;
 
@@ -1112,7 +1108,7 @@ namespace AIZombiesSupreme
             powerMessage.Foreground = true;
             powerMessage.Archived = false;
             powerMessage.Color = new Vector3(0, 0.85f, 0.9f);
-            powerMessage.SetText("Power Activated By");
+            powerMessage.SetText(AIZ.gameStrings[190]);
             HudElem powerName = HudElem.CreateServerFontString(HudElem.Fonts.HudSmall, 1.5f);
             powerName.SetPoint("CENTER", "CENTER", -700, -130);
             powerName.HideWhenInMenu = true;
@@ -1140,26 +1136,25 @@ namespace AIZombiesSupreme
             if (powerBox) return;
             //HudElem power = player.GetField<HudElem>("hud_power");
             powerHud.Color = new Vector3(0.9f, 0.9f, 0);
-            powerHud.SetText(string.Format("Power has been temporarily activated for {0} seconds", EMPTime));
+            powerHud.SetText(string.Format(AIZ.gameStrings[191], EMPTime));
             if (!AIZ.tempPowerActivated)
+                OnInterval(1000, runTempPowerTimer);
+        }
+        private static bool runTempPowerTimer()
+        {
+            if (AIZ.gameEnded) return false;
+            if (powerBox) return false;
+            EMPTime--;
+            powerHud.SetText(string.Format(AIZ.gameStrings[191], EMPTime));
+            if (EMPTime == 0 && !powerBox)
             {
-                OnInterval(1000, () =>
-                {
-                    if (AIZ.gameEnded) return false;
-                    if (powerBox) return false;
-                    EMPTime--;
-                    powerHud.SetText(string.Format("Power has been temporarily activated for {0} seconds", EMPTime));
-                    if (EMPTime == 0 && !powerBox)
-                    {
-                        AIZ.powerActivated = false;
-                        AIZ.tempPowerActivated = false;
-                        powerHud.Color = new Vector3(0.9f, 0, 0);
-                        powerHud.SetText("Power is not activated");
-                        return false;
-                    }
-                    else return true;
-                });
+                AIZ.powerActivated = false;
+                AIZ.tempPowerActivated = false;
+                powerHud.Color = new Vector3(0.9f, 0, 0);
+                powerHud.SetText(AIZ.gameStrings[183]);
+                return false;
             }
+            else return true;
         }
 
         public static IEnumerator endGame(bool win)
@@ -1206,20 +1201,16 @@ namespace AIZombiesSupreme
             {
                 if (!AIZ.isPlayer(player)) continue;
 
+                if (player.GetField<bool>("isDown"))
+                    AIZ.autoRevive_revivePlayer(player, null);
+
                 player.SetField("isDown", true);
 
-                if (player.HasField("bot")) killstreaks.killPlayerBotOnDeath(player);
+                if (player.HasField("bot")) StartAsync(killstreaks.killPlayerBotOnDeath(player));
 
-                //player.Notify("menuresponse", "team_marinesopfor", "allies");
                 player.SessionTeam = "allies";
                 player.SessionState = "spectating";
-                //OnInterval(50, () =>
-                //{
-                    //player.CloseMenu("changeclass");
-                    //player.CloseInGameMenu();
                 player.SetClientDvar("g_scriptMainMenu", "");
-                    //return true;
-                //});
 
                 //if (win) player.PlayLocalSound("victory_music");
 
@@ -1243,11 +1234,7 @@ namespace AIZombiesSupreme
                             cam.MoveTo(cam.Origin + new Vector3(0, 0, 1900), 25, 1, 1));
                     if (player != bestPlayer)
                         player.PlayerHide();
-                    else AfterDelay(50, () =>
-                    {
-                        player.ClonePlayer(6);
-                        player.PlayerHide();
-                    });
+                    else StartAsync(endGame_createTopPlayerClone(player));
 
                     AfterDelay(50, () => player.TakeAllWeapons());
                     player.PlayerLinkToAbsolute(cam);//player.CameraLinkTo(cam, "tag_origin");
@@ -1275,16 +1262,7 @@ namespace AIZombiesSupreme
             }
 
             if (!win)
-            {
-                AfterDelay(2000, () =>
-                {
-                    foreach (Entity bot in botUtil.botsInPlay)
-                    {
-                        bot.HideAllParts();
-                        if (bot.HasField("head")) bot.GetField<Entity>("head").Hide();
-                    }
-                });
-            }
+                StartAsync(endGame_hideAllBots());
 
             yield return Wait(2);
             HudElem[] endGameScreen;
@@ -1300,7 +1278,7 @@ namespace AIZombiesSupreme
             {
                 SetWinningTeam("axis");
                 SetMatchData("victor", "axis");
-                endGameScreen = createEndGameScreen(win, "Zombies ate the humans");
+                endGameScreen = createEndGameScreen(win, AIZ.gameStrings[193]);
             }
 
             yield return Wait(18);
@@ -1322,6 +1300,29 @@ namespace AIZombiesSupreme
 
                 Utilities.ExecuteCommand("map " + mapList[AIZ.rng.Next(0, maxMapsCount)]);
             }
+        }
+
+        private static IEnumerator endGame_hideAllBots()
+        {
+            yield return Wait(2);
+
+            foreach (Entity bot in botUtil.botsInPlay)
+            {
+                bot.HideAllParts();
+                if (bot.HasField("head")) bot.GetField<Entity>("head").Hide();
+            }
+        }
+
+        private static IEnumerator endGame_createTopPlayerClone(Entity player)
+        {
+            yield return WaitForFrame();
+
+            Entity clone = player.ClonePlayer(6);
+            Entity head = Spawn("script_model", clone.Origin);
+            string headModel = player.GetAttachModelName(0);
+            head.SetModel(headModel);
+            head.LinkTo(clone, "j_spine4", Vector3.Zero, Vector3.Zero);
+            player.PlayerHide();
         }
 
         private static IEnumerator endGameVision(Entity player)
@@ -1384,12 +1385,12 @@ namespace AIZombiesSupreme
             outcomeTitle.GlowColor = new Vector3(0, 0, 0);
             if (win)
             {
-                outcomeTitle.SetText("Victory!");
+                outcomeTitle.SetText(AIZ.gameStrings[194]);
                 outcomeTitle.Color = new Vector3(.3f, .7f, .2f);
             }
             else
             {
-                outcomeTitle.SetText("Defeat!");
+                outcomeTitle.SetText(AIZ.gameStrings[195]);
                 outcomeTitle.Color = new Vector3(.7f, .3f, .2f);
             }
             outcomeText.GlowColor = new Vector3(.2f, .3f, .7f);
@@ -1427,12 +1428,12 @@ namespace AIZombiesSupreme
             if (win)
             {
                 leftScore.GlowColor = new Vector3(.2f, .8f, .2f);
-                leftScore.SetText("Win");
+                leftScore.SetText(AIZ.gameStrings[196]);
             }
             else
             {
                 leftScore.GlowColor = new Vector3(.8f, .2f, .2f);
-                leftScore.SetText("Lose");
+                leftScore.SetText(AIZ.gameStrings[197]);
             }
             leftScore.GlowAlpha = 1;
             leftScore.Foreground = true;
@@ -1447,12 +1448,12 @@ namespace AIZombiesSupreme
             if (!win)
             {
                 rightScore.GlowColor = new Vector3(.2f, .8f, .2f);
-                rightScore.SetText("Win");
+                rightScore.SetText(AIZ.gameStrings[196]);
             }
             else
             {
                 rightScore.GlowColor = new Vector3(.8f, .2f, .2f);
-                rightScore.SetText("Lose");
+                rightScore.SetText(AIZ.gameStrings[197]);
             }
             rightScore.Foreground = true;
             rightScore.HideWhenInMenu = false;
@@ -1468,29 +1469,29 @@ namespace AIZombiesSupreme
             endGameText[0] = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, .85f);
             endGameText[0].SetPoint("TOPMIDDLE", "TOPMIDDLE", 0, 60);
             endGameText[0].Color = new Vector3(1, 0, 0);
-            endGameText[0].SetText("Humans Survived for");
+            endGameText[0].SetText(AIZ.gameStrings[198]);
             endGameText[0].Alpha = 0;
             endGameText[1] = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, .85f);
             endGameText[1].SetPoint("TOPMIDDLE", "TOPMIDDLE", 0, 75);
             endGameText[1].Color = new Vector3(1, .5f, .3f);
-            endGameText[1].SetText(AIZ.timePlayedMinutes.ToString() + " Minutes");
+            endGameText[1].SetText(AIZ.timePlayedMinutes.ToString() + AIZ.gameStrings[199]);
             endGameText[1].Alpha = 0;
             endGameText[2] = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, .85f);
             endGameText[2].SetPoint("TOPMIDDLE", "TOPMIDDLE", 0, 90);
             endGameText[2].Color = new Vector3(1, 1, 0);
-            endGameText[2].SetText(AIZ.timePlayed.ToString() + " Seconds");
+            endGameText[2].SetText(AIZ.timePlayed.ToString() + AIZ.gameStrings[200]);
             endGameText[2].Alpha = 0;
             endGameText[3] = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, .85f);
             endGameText[3].SetPoint("TOPMIDDLE", "TOPMIDDLE", 0, 105);
             endGameText[3].Color = new Vector3(1, 0, 0);
-            if (win) endGameText[3].SetText("Waves Survived: " + roundSystem.totalWaves.ToString());
-            else endGameText[3].SetText("Waves Survived: " + roundSystem.Wave.ToString());
+            if (win) endGameText[3].SetText(AIZ.gameStrings[201] + roundSystem.totalWaves.ToString());
+            else endGameText[3].SetText(AIZ.gameStrings[201] + roundSystem.Wave.ToString());
             endGameText[3].Alpha = 0;
             endGameText[4] = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, .85f);
             endGameText[4].SetPoint("TOPMIDDLE", "TOPMIDDLE", 0, 120);
             endGameText[4].Color = new Vector3(1, .5f, .3f);
-            if (win) endGameText[4].SetText("We Won This Fight!");
-            else endGameText[4].SetText("Zombies Won This Fight");
+            if (win) endGameText[4].SetText(AIZ.gameStrings[202]);
+            else endGameText[4].SetText(AIZ.gameStrings[203]);
             endGameText[4].Alpha = 0;
             return endGameText;
         }
@@ -1501,7 +1502,7 @@ namespace AIZombiesSupreme
             {
                 HudElem personalInfo = HudElem.CreateFontString(player, HudElem.Fonts.HudSmall, 1);
                 personalInfo.SetPoint("Center", "center");
-                personalInfo.SetText("Death Machine!");
+                personalInfo.SetText(AIZ.gameStrings[204]);
                 personalInfo.HideWhenInMenu = true;
                 personalInfo.Alpha = 1;
                 personalInfo.FadeOverTime(2);
@@ -1536,7 +1537,7 @@ namespace AIZombiesSupreme
 
             if (type == "instakill")
             {
-                info.SetText("Insta-Kill!");
+                info.SetText(AIZ.gameStrings[205]);
                 if (killHud) return;
                 powerup1 = createPowerupHud(0);
                 powerup1.SetShader("cardicon_skull_black", 48, 48);
@@ -1545,7 +1546,7 @@ namespace AIZombiesSupreme
             }
             else if (type == "2points")
             {
-                info.SetText("Double Points!");
+                info.SetText(AIZ.gameStrings[206]);
                 if (doubleHud) return;
                 powerup2 = createPowerupHud(1);
                 powerup2.SetShader("specialty_bling", 48, 48);
@@ -1553,13 +1554,13 @@ namespace AIZombiesSupreme
                 OnInterval(1000, watchDoubleFlash);
             }
             else if (type == "ammo")
-                info.SetText("Max Ammo!");
+                info.SetText(AIZ.gameStrings[207]);
             else if (type == "nuke")
-                info.SetText("Nuke!");
+                info.SetText(AIZ.gameStrings[208]);
             else if (type == "sale")
-                info.SetText("Fire Sale!");
+                info.SetText(AIZ.gameStrings[209]);
             else if (type == "freeze")
-                info.SetText("Freezer!");
+                info.SetText(AIZ.gameStrings[210]);
         }
         private static void startDeathMachineHudFlash(HudElem icon, Entity player)
         {
@@ -1577,11 +1578,7 @@ namespace AIZombiesSupreme
 
             icon.FadeOverTime(.5f);
             icon.Alpha = 1;
-            AfterDelay(500, () =>
-            {
-                icon.FadeOverTime(.5f);
-                icon.Alpha = 0;
-            });
+            StartAsync(fadeOutIcon(icon, .5f, .5f));
 
             return true;
         }
@@ -1604,11 +1601,7 @@ namespace AIZombiesSupreme
 
                 powerup1.FadeOverTime(.5f);
                 powerup1.Alpha = 1;
-                AfterDelay(500, () =>
-                {
-                    powerup1.FadeOverTime(.5f);
-                    powerup1.Alpha = 0;
-                });
+                StartAsync(fadeOutIcon(powerup1, .5f, .5f));
                 return true;
             }
             else { powerup1.Alpha = 1; return true; }
@@ -1632,11 +1625,7 @@ namespace AIZombiesSupreme
 
                 powerup2.FadeOverTime(.5f);
                 powerup2.Alpha = 1;
-                AfterDelay(500, () =>
-                {
-                    powerup2.FadeOverTime(.5f);
-                    powerup2.Alpha = 0;
-                });
+                StartAsync(fadeOutIcon(powerup2, .5f, .5f));
 
                 return true;
             }
@@ -1683,7 +1672,7 @@ namespace AIZombiesSupreme
             currentMapDescs[2].SetPoint("center", "center", 0, 150);
             currentMapVotes[2].SetPoint("bottom", "bottom", 0, 30);
             currentMapDescs[2].FontScale = 1;
-            currentMapDescs[2].SetText("^5Random");
+            currentMapDescs[2].SetText(AIZ.gameStrings[211]);
 
             controls = HudElem.CreateServerFontString(HudElem.Fonts.Bold, 1.4f);
             controls.AlignX = HudElem.XAlignments.Center;
@@ -1696,7 +1685,7 @@ namespace AIZombiesSupreme
             controls.HorzAlign = HudElem.HorzAlignments.Center_Adjustable;
             controls.Sort = 4;
             controls.VertAlign = HudElem.VertAlignments.Bottom_Adjustable;
-            controls.SetText("Vote using [{+actionslot 4}], [{+actionslot 5}], and [{+actionslot 6}] for the respective maps!");
+            controls.SetText(AIZ.gameStrings[212]);
 
             timer = HudElem.CreateServerFontString(HudElem.Fonts.Objective, 1f);
             timer.AlignX = HudElem.XAlignments.Center;
@@ -1719,7 +1708,7 @@ namespace AIZombiesSupreme
             title.HideWhenInDemo = true;
             title.HideWhenInMenu = false;
             title.SetPoint("center", "top", 0, 100);
-            title.SetText("Vote for the next map!");
+            title.SetText(AIZ.gameStrings[213]);
 
             //Determine maps
             int maxMapsCount = 36;
@@ -1986,6 +1975,14 @@ namespace AIZombiesSupreme
             return ret;
         }
 
+        public static IEnumerator fadeOutIcon(HudElem icon, float fadeTime, float delay = 0)
+        {
+            yield return Wait(delay);
+
+            icon.FadeOverTime(fadeTime);
+            icon.Alpha = 0;
+        }
+
         public static HudElem createIntermissionTimer()
         {
             if (intermission != null) { intermission.Destroy(); intermission = null; };
@@ -2005,7 +2002,7 @@ namespace AIZombiesSupreme
             intermission.GlowAlpha = .5f;
             intermission.Font = HudElem.Fonts.HudBig;
             intermission.FontScale = .7f;
-            intermission.SetText("Next Round In: " + AIZ.intermissionTimerNum);
+            intermission.SetText(AIZ.gameStrings[21] + AIZ.intermissionTimerNum);
             return intermission;
         }
 

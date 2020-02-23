@@ -23,6 +23,8 @@ namespace AIZombiesSupreme
         public static int healthScalar = 5;
         public static int dmg = 50;
         public static uint spawnedBots = 0;
+        public static bool useAltHeads = false;
+        public static bool useAltBodies = false;
 
         public static List<Vector3> botSpawns = new List<Vector3>();
         public static List<Vector3> spawnAngles = new List<Vector3>();
@@ -55,10 +57,8 @@ namespace AIZombiesSupreme
         public static bool perkDropsEnabled = true;
         public static byte nukeOffsetScalar = 1;
 
-        public static void startBotSpawn()
+        public static bool startBotSpawn()
         {
-            OnInterval(500, () =>
-            {
                 if (AIZ.gameEnded) return false;
 
                 if (botsInPlay.Count >= 25)
@@ -72,8 +72,6 @@ namespace AIZombiesSupreme
                     else if (roundSystem.isCrawlerWave) return bots.spawnBot(randomSpawn, true);
                     else return bots.spawnBot(randomSpawn, false);
                 }
-
-            });
         }
 
         public static void killBotIfUnderMap(Entity bot)
@@ -122,7 +120,7 @@ namespace AIZombiesSupreme
             if (botsForWave == spawnedBots)
             {
                 spawnedBots--;
-                startBotSpawn();//Restart spawns with less spawnedBots if at the end of the round. This will spawn a new bot correctly. Else, the loop will be running and automatically respawn a bot.
+                OnInterval(500, startBotSpawn);//Restart spawns with less spawnedBots if at the end of the round. This will spawn a new bot correctly. Else, the loop will be running and automatically respawn a bot.
             }
             else spawnedBots--;
 
@@ -161,10 +159,34 @@ namespace AIZombiesSupreme
             }
             else
             {
-                bot.SetModel(botModel);
+                if (useAltBodies)
+                    bot.SetModel("defaultactor");
+                else bot.SetModel(botModel);
                 Entity bothead = Spawn("script_model", bot.Origin);
-                bothead.SetModel(botHeadModel);
-                bothead.LinkTo(bot, "j_spine4", Vector3.Zero, Vector3.Zero);
+                if (useAltHeads)
+                {
+                    switch (AIZ._mapname)
+                    {
+                        case "mp_bootleg":
+                        case "mp_seatown":
+                        case "mp_shipbreaker":
+                        case "mp_six_ss":
+                            bothead.SetModel("chicken");
+                            break;
+                        case "mp_overwatch":
+                            bothead.SetModel("chicken_black_white");
+                            break;
+                        default:
+                            bothead.SetModel(botHeadModel);
+                            break;
+                    }
+                    bothead.LinkTo(bot, "j_spine4", Vector3.Zero, new Vector3(0, 70, 90));
+                }
+                else
+                {
+                    bothead.SetModel(botHeadModel);
+                    bothead.LinkTo(bot, "j_spine4", Vector3.Zero, Vector3.Zero);
+                }
                 bot.SetField("head", bothead);
                 bothead.Hide();
                 playAnimOnBot(bot, anim_idle);
@@ -185,10 +207,10 @@ namespace AIZombiesSupreme
             else botHitbox.SetField("currentHealth", health);
             botHitbox.SetField("damageTaken", 0);
             int xAngleOffset = isCrawler ? 90 : 0;
-            //int xOffset = isCrawler ? -30 : 0;
-            int yOffset = isCrawler ? -15 : 0;
-            botHitbox.LinkTo(bot, "j_mainroot", new Vector3(yOffset, yOffset, 0), new Vector3(0, xAngleOffset, 0));
+            int xOffset = isCrawler ? -30 : 0;
+            botHitbox.LinkTo(bot, "j_mainroot", new Vector3(xOffset, 0, 0), new Vector3(0, xAngleOffset, -90));
             botHitbox.SetField("parent", bot);
+            bot.SetField("hitbox_linkOffset_y", 0);
 
             if (!isCrawler)
             {
@@ -241,6 +263,7 @@ namespace AIZombiesSupreme
             botHitbox.SetField("isBoss", true);
             bot.SetField("isBoss", true);
             bot.SetField("hitbox", botHitbox);
+            bot.SetField("hitbox_linkOffset_y", 0);
             bot.SetField("state", "idle");
             bot.SetField("isAttacking", false);
             bot.SetField("currentWaypoint", bot);
@@ -274,15 +297,24 @@ namespace AIZombiesSupreme
                 meansOfDeath = "MOD_PASSTHRU";
                 damage = 10;
             }
-            /*
+            else if ((string)weapon == "manned_gl_turret_mp")//Sentry tweaks
+            {
+                player = attacker.As<Entity>().GetField<Entity>("owner");
+                meansOfDeath = "MOD_PASSTHRU";
+                damage = 300;
+            }
             else if ((string)weapon == "remote_tank_projectile_mp" || (string)weapon == "uav_strike_projectile_mp")
             {
                 player = attacker.As<Entity>().GetField<Entity>("owner");
                 meansOfDeath = "MOD_PASSTHRU";
             }
-            */
+            else if ((string)weapon == "ac130_25mm_mp")//A10 tweaks
+            {
+                //player = attacker.As<Entity>().GetField<Entity>("owner");
+                meansOfDeath = "MOD_PASSTHRU";
+            }
 
-            //Log.Write(LogLevel.Debug, (string)weapon);
+            //Utilities.PrintToConsole((string)meansOfDeath);
 
             if ((string)meansOfDeath == "MOD_BLEEDOUT")
             {
@@ -292,7 +324,7 @@ namespace AIZombiesSupreme
             }
             else
             {
-                if ((string)weapon != "sentry_minigun_mp" && (string)weapon != "remote_uav_weapon_mp") PlayFX(AIZ.fx_blood, point.As<Vector3>());//Only play FX if the weapon isn't a script weapon
+                if ((string)weapon != "sentry_minigun_mp" && (string)weapon != "manned_gl_turret_mp" && (string)weapon != "remote_uav_weapon_mp" && (string)meansOfDeath != "MOD_EXPLOSIVE_BULLET") PlayFX(AIZ.fx_blood, point.As<Vector3>());//Only play FX if the weapon isn't a script weapon
                 doBotDamage((int)damage, player, (string)weapon, hitbox, (string)meansOfDeath, point.As<Vector3>());
             }
             string botState = currentBot.GetField<string>("state");
@@ -547,7 +579,7 @@ namespace AIZombiesSupreme
                 int total = botsInPlay.Count;
                 owner.SetField("cash", owner.GetField<int>("cash") + (100 * total));
                 hud.scorePopup(owner, 100 * total);
-                hud.scoreMessage(owner, "Nuke!");
+                hud.scoreMessage(owner, AIZ.gameStrings[208]);
             }
             if (isStreak)
             {
@@ -573,17 +605,30 @@ namespace AIZombiesSupreme
             if (instaKillTimerStarted) return;
             instaKillTimerStarted = true;
             hud.showPowerUpHud("instakill", null);
-            OnInterval(1000, () =>
-                {
-                    if (AIZ.gameEnded) return false;
-                    instaKillTime--;
-                    if (instaKillTime == 0)
-                    {
-                        instaKillTimerStarted = false;
-                        return false;
-                    }
-                    else return true;
-                });
+            OnInterval(1000, runInstakillTimer);
+        }
+
+        private static bool runInstakillTimer()
+        {
+            if (AIZ.gameEnded) return false;
+            instaKillTime--;
+            if (instaKillTime == 0)
+            {
+                instaKillTimerStarted = false;
+                return false;
+            }
+            else return true;
+        }
+        private static bool runDoublePointsTimer()
+        {
+            if (AIZ.gameEnded) return false;
+            doublePointsTime--;
+            if (doublePointsTime == 0)
+            {
+                doublePointsTimerStarted = false;
+                return false;
+            }
+            else return true;
         }
 
         public static void startDoublePoints()
@@ -592,17 +637,7 @@ namespace AIZombiesSupreme
             if (doublePointsTimerStarted) return;
             doublePointsTimerStarted = true;
             hud.showPowerUpHud("2points", null);
-            OnInterval(1000, () =>
-            {
-                if (AIZ.gameEnded) return false;
-                doublePointsTime--;
-                if (doublePointsTime == 0)
-                {
-                    doublePointsTimerStarted = false;
-                    return false;
-                }
-                else return true;
-            });
+            OnInterval(1000, runDoublePointsTimer);
         }
 
         public static string getHurtAnim(Entity bot)
@@ -621,10 +656,31 @@ namespace AIZombiesSupreme
         public static void playAnimOnBot(Entity bot, string anim)
         {
             bot.ScriptModelPlayAnim(anim);
+
+            if (anim == anim_walk && bot.HasField("hitbox") && (bot.HasField("hitbox_linkOffset_y") && bot.GetField<int>("hitbox_linkOffset_y") == 0))
+            {
+                bool isCrawler = !bot.HasField("head") && !bot.HasField("isBoss");
+                int xAngleOffset = isCrawler ? 90 : 0;
+                int xOffset = isCrawler ? -30 : 0;
+                Entity botHitbox = bot.GetField<Entity>("hitbox");
+                botHitbox.LinkTo(bot, "j_mainroot", new Vector3(xOffset, -10, 0), new Vector3(0, xAngleOffset, -90));
+                bot.SetField("hitbox_linkOffset_y", -10);
+            }
+            else if (bot.HasField("hitbox") && (bot.HasField("hitbox_linkOffset_y") && bot.GetField<int>("hitbox_linkOffset_y") == -10))
+            {
+                bool isCrawler = !bot.HasField("head") && !bot.HasField("isBoss");
+                int xAngleOffset = isCrawler ? 90 : 0;
+                int xOffset = isCrawler ? -30 : 0;
+                Entity botHitbox = bot.GetField<Entity>("hitbox");
+                botHitbox.LinkTo(bot, "j_mainroot", new Vector3(xOffset, 0, 0), new Vector3(0, xAngleOffset, -90));
+                bot.SetField("hitbox_linkOffset_y", 0);
+            }
+            /*
             if (bot.HasField("head"))
             {
                 bot.GetField<Entity>("head").ScriptModelPlayAnim(anim);
             }
+            */
         }
 
         public static void dropGlowstick(Vector3 position)

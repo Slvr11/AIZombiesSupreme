@@ -51,7 +51,7 @@ namespace AIZombiesSupreme
             if (!isBossWave) hud.stringsCleared = false;
             
             checkForHellMapVision();
-            botUtil.startBotSpawn();
+            OnInterval(500, botUtil.startBotSpawn);
             onRoundChange();
             AIZ.zState = "ingame";
             foreach (Entity players in Players)
