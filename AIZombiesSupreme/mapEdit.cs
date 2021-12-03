@@ -406,7 +406,12 @@ namespace AIZombiesSupreme
         }
         private static bool revivePlayer_logicLoop(Entity reviver, Entity reviveTrigger, HudElem progressBar)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                return false;
+            }
             if (reviver.UseButtonPressed() && reviveTrigger.GetField<Entity>("player").IsAlive && reviver.Origin.DistanceTo(reviveTrigger.Origin) < 75 && !reviver.GetField<bool>("isDown"))
             {
                 int reviveCounter = reviveTrigger.GetField<int>("reviveCounter");
@@ -492,7 +497,12 @@ namespace AIZombiesSupreme
         }
         private static bool grabCarePackage_logicLoop(Entity player, Entity package, HudElem progressBar)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                return false;
+            }
             if (!AIZ.isPlayer(player)) return false;
 
             if (player.UseButtonPressed() && player.Origin.DistanceTo(package.Origin) < 75)
@@ -566,7 +576,12 @@ namespace AIZombiesSupreme
         }
         private static bool setExpAmmo_logicLoop(Entity box, Entity player, HudElem progressBar)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                progressBar.GetField("bar").As<HudElem>().Destroy();
+                progressBar.Destroy();
+                return false;
+            }
             if (player.UseButtonPressed() && player.Origin.DistanceTo(box.Origin) < 75)
             {
                 int grabCounter = player.GetField<int>("percent");
@@ -592,7 +607,7 @@ namespace AIZombiesSupreme
                     foreach (string weapon in weaponsList)
                     {
                         string type = WeaponType(weapon);
-                        if (type == "projectile" || type == "grenade") continue;
+                        if (type == "projectile" || type == "grenade" || AIZ.isRayGun(weapon)) continue;
 
                         player.SetWeaponAmmoClip(weapon, 0);
                         player.GiveMaxAmmo(weapon);
@@ -1025,11 +1040,19 @@ namespace AIZombiesSupreme
                     if (AIZ.isPlayer(player)) player.PlayLocalSound("nuke_wave");
                 }
 
-                Entity[] fx = crate.GetField<Entity[]>("fx_xmas");
-                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin");
-                StopFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin");
-                StopFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin");
-                StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin");
+                if (crate.HasField("fx_xmas"))
+                {
+                    Entity[] fx = crate.GetField<Entity[]>("fx_xmas");
+                    StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin");
+                    StopFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin");
+                    StopFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin");
+                    StopFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin");
+
+                    AfterDelay(6000, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin"));
+                    AfterDelay(6200, () => PlayFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin"));
+                    AfterDelay(6400, () => PlayFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin"));
+                    AfterDelay(6800, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin"));
+                }
 
                 yield return Wait(2.8f);
 
@@ -1048,11 +1071,6 @@ namespace AIZombiesSupreme
                 rebar.MoveTo(rebar.Origin - new Vector3(0, 0, 50), 4, 0.5f, 1);
 
                 yield return Wait(1);
-
-                AfterDelay(200, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[0], "tag_origin"));
-                AfterDelay(400, () => PlayFXOnTag(AIZ.fx_rayGun, fx[1], "tag_origin"));
-                AfterDelay(600, () => PlayFXOnTag(AIZ.fx_rayGun, fx[2], "tag_origin"));
-                AfterDelay(800, () => PlayFXOnTag(AIZ.fx_rayGunUpgrade, fx[3], "tag_origin"));
 
                 Vector3 dropImpulse = new Vector3(300, 50, -60);
                 crate.PhysicsLaunchServer(new Vector3(0, 0, 0), dropImpulse);
@@ -2331,16 +2349,21 @@ namespace AIZombiesSupreme
 
         public static void useBank(Entity player, bool isWithdraw)
         {
-            if (!AIZ.powerActivated) return;
+            if (!hud.powerBox) return;//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
             if (player.SessionTeam != "allies" || !player.IsAlive) return;
             if (!isWithdraw)
             {
                 if (player.GetField<int>("cash") < 1000) return;
                 int totalBalance = (int)player.GetPlayerData("money");
 
-                if (totalBalance > maxBankBalance)
+                if (totalBalance >= maxBankBalance)
                 {
-                    player.IPrintLnBold(string.Format(AIZ.gameStrings[328], 0));
+                    if (totalBalance > maxBankBalance)//Reset bank to max if players are above max
+                    {
+                        totalBalance = maxBankBalance;
+                        player.SetPlayerData("money", totalBalance);
+                    }
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[328]));
                     return;
                 }
 
@@ -2361,6 +2384,10 @@ namespace AIZombiesSupreme
                 }
                 int totalBalance = (int)player.GetPlayerData("money");
                 totalBalance -= 1000;
+                if (totalBalance > maxBankBalance)//Reset bank to max if players are above max
+                {
+                    totalBalance = maxBankBalance;
+                }
                 //Log.Write(LogLevel.All, "tmpBalance: {0}", totalBalance);
                 player.SetField("cash", player.GetField<int>("cash") + 900);
                 hud.scorePopup(player, 900);
@@ -2684,11 +2711,13 @@ namespace AIZombiesSupreme
         public static string getUsableText(Entity usable, Entity player)
         {
             if (player.SessionTeam != "allies") return string.Empty;
+            if (AIZ.gameEnded) return string.Empty;
             switch (usable.GetField<string>("usabletype"))
             {
                 case "revive":
                     Entity downed = usable.GetField<Entity>("player");
                     if (player == downed || usable.GetField<Entity>("user") == player) return "";
+                    else if (player.GetField<bool>("isDown")) return "";
                     else if (usable.GetField<Entity>("user") != usable) return downed.Name + AIZ.gameStrings[299];
                     else return AIZ.gameStrings[300] + downed.Name;
                 case "giftTrigger":
@@ -2739,7 +2768,7 @@ namespace AIZombiesSupreme
                     else if (usable.GetField<bool>("isMoving")) return "";
                     else return AIZ.gameStrings[291];
                 case "bank":
-                    if (!AIZ.powerActivated) return AIZ.gameStrings[282];
+                    if (!hud.powerBox) return AIZ.gameStrings[282];//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
                     else return AIZ.gameStrings[292];
                 case "perk1":
                     if (!AIZ.powerActivated) return AIZ.gameStrings[282];

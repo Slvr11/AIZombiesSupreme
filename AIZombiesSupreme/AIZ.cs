@@ -39,7 +39,7 @@ namespace AIZombiesSupreme
         public static int maxPlayerHealth_Jugg = 250;
         public static bool powerActivated = false;
         public static bool tempPowerActivated = false;
-        public static readonly string version = "1.4";
+        public static readonly string version = "1.41";
         public static readonly string dev = "Slvr99";
 
         private static readonly int[] expectedDevResults = new int[100];//Set to 100 and generate results at runtime
@@ -1981,7 +1981,7 @@ namespace AIZombiesSupreme
                                 player.TakeWeapon(player.CurrentWeapon);
                                 updatePlayerWeaponsList(player, player.CurrentWeapon, true);
                             }
-                            player.SetField("perk4bought", false);
+                            //player.SetField("perk4bought", false);
                             player.SetField("perk4weapon", "");
                         }
                         else if (i == 5)
@@ -2976,12 +2976,12 @@ namespace AIZombiesSupreme
             }
             if (player.GetField<bool>("perk1bought"))
             {
-                player.MaxHealth = 250;
+                player.MaxHealth = maxPlayerHealth_Jugg;
                 player.Health = player.MaxHealth;
             }
             else
             {
-                player.Health = 100;
+                player.Health = maxPlayerHealth;
                 player.MaxHealth = player.Health;
             }
             player.IPrintLnBold(endMessage);
@@ -3100,14 +3100,14 @@ namespace AIZombiesSupreme
             }
             return true;
         }
-
+        /*
         private static bool runGameTimeoutReset()
         {
             ResetTimeout();
             if (gameEnded) return false;
             return true;
         }
-
+        */
         private static IEnumerator initGameVisions()
         {
             yield return WaitForFrame();

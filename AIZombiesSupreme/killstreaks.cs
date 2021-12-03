@@ -537,7 +537,12 @@ namespace AIZombiesSupreme
         }
         private static bool sentryHoldWatcher(Entity player, Entity sentry, bool canCancel)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                sentry.SetSentryCarrier(null);
+                sentry.Delete();
+                return false;
+            }
             if (!player.IsAlive || !AIZ.isPlayer(player)) return false;
             if (sentry.GetField<bool>("canBePlaced") && player.GetField<bool>("isCarryingSentry") && player.AttackButtonPressed() && player.IsOnGround())
             {
@@ -1008,7 +1013,13 @@ namespace AIZombiesSupreme
         }
         private static bool littlebirdHoldWatcher(Entity bird, Entity player)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                bird.SetSentryCarrier(null);
+                bird.GetField<Entity>("visual").Delete();
+                bird.Delete();
+                return false;
+            }
 
             Entity birdVisual = bird.GetField<Entity>("visual");
             Vector3 anglesToForward = AnglesToForward(new Vector3(0, player.GetPlayerAngles().Y, 0));
@@ -1050,7 +1061,7 @@ namespace AIZombiesSupreme
                 Vector3 origin = player.Origin + angleToForward * 50;
                 spawnRemoteUAV(player, origin, sentryAngles);
                 bird.Delete();
-                bird.GetField<Entity>("visual").Delete();
+                birdVisual.Delete();
                 return false;
             }
             else return true;
@@ -1180,7 +1191,11 @@ namespace AIZombiesSupreme
         }
         private static bool dragonfly_moveRerouteMarker(Entity player, Entity marker)
         {
-            if (AIZ.gameEnded) return false;
+            if (AIZ.gameEnded)
+            {
+                marker.Delete();
+                return false;
+            }
 
             if (!player.HasField("ownedLittlebird"))
             {
