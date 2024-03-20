@@ -125,7 +125,14 @@ namespace AIZombiesSupreme
                     if (isCrawlerWave || isBossWave) AIZ.giveMaxAmmo(players);
                 }
             }
-            //if (!e_hud.stringsCleared && !isBossWave && Wave > 4 && f_botUtil.botsInPlay.Count < 10 && f_botUtil.botsForWave - f_botUtil.spawnedBots == 0) StartAsync(e_hud.clearAllGameStrings());
+            /*
+            if (!hud.stringsCleared && !isBossWave && Wave > 4 && botUtil.botsInPlay.Count > 1
+                  && hud.currentUnlocalizedConfigStrings > hud.maxUnlocalizedConfigStrings)
+            {
+                Utilities.PrintToConsole("Clearing strings due to comfortable limit: " + hud.currentUnlocalizedConfigStrings);
+                hud.clearAllGameStrings();
+            }
+            */
             checkForCompass();
         }
 
@@ -148,13 +155,6 @@ namespace AIZombiesSupreme
             int veh = GetNumVehicles();
             if (((botUtil.botsInPlay.Count < 11 && veh == 0) || (botUtil.botsInPlay.Count < 6 && veh > 0)) && botUtil.botsForWave - botUtil.spawnedBots == 0)
             {
-                if (!hud.stringsCleared && !isBossWave && Wave > 4 && botUtil.botsInPlay.Count > 1
-                    && hud.currentUnlocalizedConfigStrings > hud.maxUnlocalizedConfigStrings)
-                {
-                    //Utilities.PrintToConsole("Clearing strings due to comfortable limit: " + hud.currentUnlocalizedConfigStrings);
-                    StartAsync(hud.clearAllGameStrings());
-                }
-
                 foreach (Entity bot in botUtil.botsInPlay)
                 {
                     if (bot.GetField<bool>("isOnCompass") || !bot.GetField<bool>("isAlive")) continue;
@@ -165,6 +165,13 @@ namespace AIZombiesSupreme
                     Objective_Team(curObjID, "allies");
                     Objective_OnEntity(curObjID, bot);
                     mapEdit.addObjID(bot, curObjID);
+                }
+
+                if (!hud.stringsCleared && !isBossWave && Wave > 4 && botUtil.botsInPlay.Count > 1
+                    && hud.currentUnlocalizedConfigStrings > hud.maxUnlocalizedConfigStrings)
+                {
+                    //Utilities.PrintToConsole("Clearing strings due to comfortable limit: " + hud.currentUnlocalizedConfigStrings);
+                    hud.clearAllGameStrings();
                 }
             }
         }

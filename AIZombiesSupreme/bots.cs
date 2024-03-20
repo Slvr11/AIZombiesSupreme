@@ -61,7 +61,16 @@ namespace AIZombiesSupreme
 
             onBotUpdate();
 
-            OnInterval(100, () => botAI(bot, botHitbox, isCrawler, false));
+            if (!useAlternatingThread)
+            {
+                OnInterval(100, () => botAI(bot, botHitbox, isCrawler, false));
+                useAlternatingThread = true;
+            }
+            else
+            {
+                AfterDelay(50, () => OnInterval(100, () => botAI(bot, botHitbox, isCrawler, false)));
+                useAlternatingThread = false;
+            }
 
             //Check for waypoints on spawn once
             foreach (Entity v in mapEdit.waypoints)
@@ -196,8 +205,8 @@ namespace AIZombiesSupreme
                     Vector3 playerHeadTag = p.GetTagOrigin("j_head");
                     bool trace;
                     if (!isCrawler && !isBoss)
-                        trace = SightTracePassed(botHeadTag, playerHeadTag, false, botHitbox, ai.GetField<Entity>("head"), ai.GetField<Entity>("headHitbox"));
-                    else trace = SightTracePassed(botHeadTag, playerHeadTag, false, botHitbox);
+                        trace = SightTracePassed(botHeadTag, playerHeadTag, false, ai, ai.GetField<Entity>("head"));
+                    else trace = SightTracePassed(botHeadTag, playerHeadTag, false, ai);
                     if (trace)
                     {
                         //Log.Write(LogLevel.All, "Traced {0}", p.Name);
@@ -269,22 +278,29 @@ namespace AIZombiesSupreme
             //Now we are done targeting, do the action for the target
 
             #region motion
-            if (ai.GetField<bool>("isAttacking")) return true;//Stop moving to attack. Prevent bots getting stuck into players
-            /*
-            foreach (Entity bot in botsInPlay)//Prevent bots from combining into each other
+            if (ai.GetField<bool>("isAttacking")) return true;//Stop moving to attack.
+
+            if (!freezerActivated && target != null && IsPlayer(target))
             {
-                if (ai == bot) continue;
-                Vector3 closeOrigin = bot.Origin;
-                if (botOrigin.DistanceTo(closeOrigin) < 10)//Move away from the bot and recalc
+                bool hasCollidedWithOtherBot = false;
+                foreach (Entity bot in botsInPlay)//Prevent bots from combining into each other
                 {
-                    Vector3 dir = VectorToAngles(closeOrigin - botOrigin);
-                    Vector3 awayPos = botOrigin - dir * 100;
-                    ai.MoveTo(awayPos, botOrigin.DistanceTo(awayPos) / 120);
-                    ai.RotateTo(new Vector3(0, -dir.Y, 0), .3f, .1f, .1f);
-                    return true;
+                    if (ai == bot) continue;
+                    Vector3 closeOrigin = bot.Origin;
+                    if (botOrigin.DistanceTo(closeOrigin) < 15)//Move away from the bot and recalc
+                    {
+                        Vector3 dir = VectorToAngles(botOrigin - closeOrigin);
+                        Vector3 forward = AnglesToForward(new Vector3(0, dir.Y, 0));
+                        Vector3 awayPos = botOrigin - (forward * 50);
+                        ai.MoveTo(awayPos, botOrigin.DistanceTo(awayPos) / 120);
+                        ai.RotateTo(new Vector3(0, -dir.Y, 0), .3f, .1f, .1f);
+                        hasCollidedWithOtherBot = true;
+                        break;
+                    }
                 }
+                if (hasCollidedWithOtherBot)
+                    return true;
             }
-            */
             
             float Ground = GetGroundPosition(botOrigin, 12).Z;
 

@@ -27,7 +27,7 @@ namespace AIZombiesSupreme
 
         public static bool stringsCleared = false;
         public static readonly int maxUnlocalizedConfigStrings = 125;//Actual number is 297
-        public static readonly int maxUnlocalizedConfigStrings_danger = 160;//The number of config strings for the game to assume dangerous
+        public static int maxUnlocalizedConfigStrings_danger = 160;//The number of config strings for the game to assume dangerous
         private static string[] unlocalizedConfigStrings = new string[297];
         public static int currentUnlocalizedConfigStrings = 0;
         //Voting
@@ -480,14 +480,14 @@ namespace AIZombiesSupreme
             {
                 //We're in the danger zone, we have to clear or else we will crash
                 //Utilities.PrintToConsole("Clearing strings due to Danger Zone");
-                StartAsync(clearAllGameStrings());
+                clearAllGameStrings();
             }
         }
 
-        public static IEnumerator clearAllGameStrings()
+        public static void clearAllGameStrings()
         {
-            if (AIZ.gameEnded) yield return null;
-            if (stringsCleared) yield return null;
+            if (AIZ.gameEnded) return;
+            if (stringsCleared) return;
 
             stringsCleared = true;
 
@@ -503,8 +503,11 @@ namespace AIZombiesSupreme
 
             //yield return WaitForFrame();//Wait a frame before clearing strings
 
-            //Log.Write(LogLevel.Info, "Clearing all strings");
+            //Utilities.PrintToConsole("Clearing all strings");
             zombieCounter.ClearAllTextAfterHudelem();//Clear all strings from one hud
+
+            //yield return WaitForFrame();
+
             for (int i = 0; i < currentUnlocalizedConfigStrings; i++)//Reset the config string library
             {
                 unlocalizedConfigStrings[i] = "";
@@ -514,12 +517,13 @@ namespace AIZombiesSupreme
             //resetGameHud();
 
             //yield return WaitForFrame();//To allow game to catch up before sending string info
-
-            //Clear all client strings first
-            foreach (Entity player in Players)
+            AfterDelay(50, () =>
             {
-                if (!player.HasField("aizHud_created")) continue;
-                HudElem[] aizHUD = new HudElem[9] { player.GetField<HudElem>("hud_ammoSlash"),
+                //Clear all client strings first
+                foreach (Entity player in Players)
+                {
+                    if (!player.HasField("aizHud_created")) continue;
+                    HudElem[] aizHUD = new HudElem[9] { player.GetField<HudElem>("hud_ammoSlash"),
                 player.GetField<HudElem>("hud_ammoStock"),
                 player.GetField<HudElem>("hud_ammoClip"),
                 player.GetField<HudElem>("hud_scoreMessage"),
@@ -529,88 +533,87 @@ namespace AIZombiesSupreme
                 player.GetField<HudElem>("hud_weaponName"),
                 player.GetField<HudElem>("hud_message") };
 
-                //reassign configstrings
-                _setText(aizHUD[0], "/");
+                    //reassign configstrings
+                    _setText(aizHUD[0], "/");
 
-                //aizHUD[1]._setText("");
-                //aizHUD[2]._setText("");
-                //updateAmmoHud(player, false);//Update hud 0-2
-                _setText(aizHUD[3], "");
-                //scorePopup(player, 0);
-                //scoreMessage(player, "");
-                _setText(aizHUD[4], AIZ.gameStrings[180]);
-                _setText(aizHUD[5], AIZ.gameStrings[181]);
-                _setText(aizHUD[6], (string)aizHUD[6].GetField("text"));
-                _setText(aizHUD[7], "");
-                _setText(aizHUD[8], "");
+                    //aizHUD[1]._setText("");
+                    //aizHUD[2]._setText("");
+                    //updateAmmoHud(player, false);//Update hud 0-2
+                    _setText(aizHUD[3], "");
+                    //scorePopup(player, 0);
+                    //scoreMessage(player, "");
+                    _setText(aizHUD[4], AIZ.gameStrings[180]);
+                    _setText(aizHUD[5], AIZ.gameStrings[181]);
+                    _setText(aizHUD[6], (string)aizHUD[6].GetField("text"));
+                    _setText(aizHUD[7], "");
+                    _setText(aizHUD[8], "");
 
-                //Temp huds in case they are on screen at reset
-                //intro
-                if (player.HasField("hud_intro"))
-                {
-                    //Log.Write(LogLevel.All, "Has Intro");
-                    HudElem h = player.GetField<HudElem>("hud_intro");
-                    _setText(h, string.Format(AIZ.gameStrings[22],
-                            player.Name, AIZ.getZombieMapname(), roundSystem.totalWaves, AIZ.version));
+                    //Temp huds in case they are on screen at reset
+                    //intro
+                    if (player.HasField("hud_intro"))
+                    {
+                        //Log.Write(LogLevel.All, "Has Intro");
+                        HudElem h = player.GetField<HudElem>("hud_intro");
+                        _setText(h, string.Format(AIZ.gameStrings[22],
+                                player.Name, AIZ.getZombieMapname(), roundSystem.totalWaves, AIZ.version));
+                    }
+                    //perk earns
+                    if (player.HasField("hud_earnPerk"))
+                    {
+                        //Log.Write(LogLevel.All, "Has Earns");
+                        HudElem[] h = player.GetField<HudElem[]>("hud_earnPerk");
+                        _setText(h[0], (string)h[0].GetField("text"));
+                        _setText(h[1], (string)h[1].GetField("text"));
+                    }
+                    //hints
+                    /*
+                    if (player.HasField("hud_lbHint"))
+                    {
+                        Log.Write(LogLevel.All, "Has Hint");
+                        HudElem h = player.GetField<HudElem>("hud_lbHint");
+                        h._setText(AIZ.gameStrings[228]);
+                    }
+                    */
                 }
-                //perk earns
-                if (player.HasField("hud_earnPerk"))
+
+                //Clear server hud
+                _setText(zombieCounter, AIZ.gameStrings[182] + botUtil.botsInPlay.Count);
+
+                if (!AIZ.isHellMap)
                 {
-                    //Log.Write(LogLevel.All, "Has Earns");
-                    HudElem[] h = player.GetField<HudElem[]>("hud_earnPerk");
-                    _setText(h[0], (string)h[0].GetField("text"));
-                    _setText(h[1], (string)h[1].GetField("text"));
+                    if (powerBox) _setText(powerHud, AIZ.gameStrings[275]);
+                    else if (!powerBox && AIZ.tempPowerActivated) _setText(powerHud, string.Format(AIZ.gameStrings[191], EMPTime));
+                    else _setText(powerHud, AIZ.gameStrings[192]);
                 }
-                //hints
-                /*
-                if (player.HasField("hud_lbHint"))
+
+                //temp huds
+                /*Disabling these checks because currently the reset happens in round. If we change the reset then we need to re-enable this
+                if (roundEnd != null)
                 {
-                    Log.Write(LogLevel.All, "Has Hint");
-                    HudElem h = player.GetField<HudElem>("hud_lbHint");
-                    h._setText(AIZ.gameStrings[228]);
+                    //Log.Write(LogLevel.All, "Round End");
+                    if (roundSystem.isBossWave) roundEnd._setText(AIZ.gameStrings[184]);
+                    else if (roundSystem.isCrawlerWave) roundEnd._setText(AIZ.gameStrings[186]);
+                    else roundEnd._setText(AIZ.gameStrings[188] + roundSystem.Wave + AIZ.gameStrings[189]);
+                }
+                if (roundStart != null)
+                {
+                    //Log.Write(LogLevel.All, "Round Start");
+                    roundStart._setText(AIZ.gameStrings[188] + roundSystem.Wave);
+                }
+                if (intermission != null)
+                {
+                    //Log.Write(LogLevel.All, "Intermission");
+                    intermission._setText("Next Round In: " + AIZ.intermissionTimerNum.ToString());
                 }
                 */
-            }
+                //if (info != null) info._setText("");
 
-            //Clear server hud
-            _setText(zombieCounter, AIZ.gameStrings[182] + botUtil.botsInPlay.Count);
-
-            if (!AIZ.isHellMap)
-            {
-                if (powerBox) _setText(powerHud, AIZ.gameStrings[275]);
-                else if (!powerBox && AIZ.tempPowerActivated) _setText(powerHud, string.Format(AIZ.gameStrings[191], EMPTime));
-                else _setText(powerHud, AIZ.gameStrings[192]);
-            }
-
-            //temp huds
-            /*Disabling these checks because currently the reset happens in round. If we change the reset then we need to re-enable this
-            if (roundEnd != null)
-            {
-                //Log.Write(LogLevel.All, "Round End");
-                if (roundSystem.isBossWave) roundEnd._setText(AIZ.gameStrings[184]);
-                else if (roundSystem.isCrawlerWave) roundEnd._setText(AIZ.gameStrings[186]);
-                else roundEnd._setText(AIZ.gameStrings[188] + roundSystem.Wave + AIZ.gameStrings[189]);
-            }
-            if (roundStart != null)
-            {
-                //Log.Write(LogLevel.All, "Round Start");
-                roundStart._setText(AIZ.gameStrings[188] + roundSystem.Wave);
-            }
-            if (intermission != null)
-            {
-                //Log.Write(LogLevel.All, "Intermission");
-                intermission._setText("Next Round In: " + AIZ.intermissionTimerNum.ToString());
-            }
-            */
-            //if (info != null) info._setText("");
-
-            yield return WaitForFrame();
-
-            foreach (Entity bot in currentBotPool)
-            {
-                Entity botHitbox = bot.GetField<Entity>("hitbox");
-                botHitbox.SetField("canBeDamaged", true);
-            }
+                foreach (Entity bot in currentBotPool)
+                {
+                    Entity botHitbox = bot.GetField<Entity>("hitbox");
+                    botHitbox.SetField("canBeDamaged", true);
+                }
+            });
         }
 
         public static void updateAmmoHud(Entity player, bool updateName, string newWeapon = "")
@@ -893,7 +896,7 @@ namespace AIZombiesSupreme
                     return "^2Hand-gun";
                 case "iw5_pp90m1_mp_silencer_xmags_camo10":
                     return "^2Flamethrower";
-                case "iw5_pecheneg_mp_rof_thermallmg":
+                case "iw5_pecheneg_mp_thermal_rof":
                     return "^8Death Machine";
                 case "airdrop_trap_marker_mp":
                     return "Emergency Airdrop Marker";
@@ -1364,15 +1367,22 @@ namespace AIZombiesSupreme
             }
             else
             {
-                int maxMapsCount = 35;
-                if (!AIZ.dlcEnabled) maxMapsCount = 15;
+                int maxMapsCount = mapList.Length;
+                if (!AIZ.dlcEnabled) maxMapsCount = 16;
 
-                Utilities.ExecuteCommand("map " + mapList[AIZ.rng.Next(0, maxMapsCount)]);
+                Utilities.ExecuteCommand("map " + mapList[AIZ.rng.Next(1, maxMapsCount+1)]);
             }
         }
 
         private static IEnumerator endGame_hideAllBots()
         {
+            //Add the lose animation to the endgame
+            foreach (Entity bot in botUtil.botsInPlay)
+            {
+                botUtil.playAnimOnBot(bot, botUtil.anim_lose);
+                bot.MoveTo(bot.Origin, 0.05f);
+            }
+
             yield return Wait(2);
 
             foreach (Entity bot in botUtil.botsInPlay)
@@ -1937,7 +1947,7 @@ namespace AIZombiesSupreme
         {
             if (player != null && AIZ.isPlayer(player)) player.IPrintLnBold("^5" + text[0]);
             else IPrintLnBold("^5" + text[0]);
-            if (text.Length < 2) yield return null;
+            if (text.Length < 2) yield break;
             int time = 3;//text[1].Length * 100;
             for (int i = 1; i < text.Length; i++)
             {
@@ -1949,7 +1959,7 @@ namespace AIZombiesSupreme
         public static IEnumerator moon_doInfoMessage(params string[] text)
         {
             IPrintLnBold("^5" + text[0]);
-            if (text.Length < 2) yield return null;
+            if (text.Length < 2) yield break;
             int time = 3;//text[1].Length * 100;
             for (int i = 1; i < text.Length; i++)
             {

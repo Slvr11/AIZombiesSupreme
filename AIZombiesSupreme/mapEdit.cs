@@ -27,6 +27,8 @@ namespace AIZombiesSupreme
         private static byte boxCounter = 0;
         private static byte boxIndex = 0;
 
+        private static Entity[] moonTriggers = new Entity[7];
+
         private static readonly int maxBankBalance = 100000;
 
         //private readonly static Entity level = Entity.GetEntity(2046);
@@ -39,7 +41,22 @@ namespace AIZombiesSupreme
 
         public static void createWaypoints()
         {
+            var customWaypoints = checkExtraMapWaypoints();
+            if (customWaypoints != null)
+            {
+                char[] newLineChars = new char[] {'\n', '\r'};
+                foreach (Vector3 point in customWaypoints)
+                {
+                    Entity wp = Spawn("script_origin", point + new Vector3(0, 0, 5));
+                    waypoints.Add(wp);
+                }
+                if (waypoints.Count > 0) AfterDelay(100, bakeWaypoints);
+                return;
+            }
+
             string file = maplist[randomMap].Replace(".map", ".wyp");
+            if (!File.Exists(file))
+                return;
             //if (randomMap != -1) file = "scripts\\maps\\" + _mapname + "_aiz_waypoints_" + randomMap + ".txt";
             foreach (string s in File.ReadAllLines(file))
             {
@@ -47,8 +64,6 @@ namespace AIZombiesSupreme
                 if (point.Equals(Vector3.Zero)) continue;
                 Entity wp = Spawn("script_origin", point + new Vector3(0, 0, 5));
                 waypoints.Add(wp);
-                //pathfinding.nodes.Add(point);
-                //pathfinding.pathNode wp = new pathfinding.pathNode(point);
             }
             if (waypoints.Count > 0) AfterDelay(100, bakeWaypoints);
         }
@@ -207,10 +222,9 @@ namespace AIZombiesSupreme
                 case "wallweapon":
                     usedWallWeapon(ent, player);
                     break;
-                //case "helmet":
-                    //useHelmet(player);
-                    //break;
-
+                case "helmet":
+                    useHelmet(player);
+                    break;
                 case "dome_eeDog":
                     dome_checkEasterEggTrigger1(ent, player);
                     break;
@@ -374,6 +388,7 @@ namespace AIZombiesSupreme
                         return;//We found a usable close enough, get out of this loop
                     }
                 }
+                /*
                 if (Entity.Level.HasField("allowGifting"))
                 {
                     foreach (Entity giftTrigger in usables.FindAll((u) => u.GetField<string>("usabletype") == "giftTrigger"))
@@ -385,6 +400,7 @@ namespace AIZombiesSupreme
                         return;
                     }
                 }
+                */
             }
         }
 
@@ -679,12 +695,12 @@ namespace AIZombiesSupreme
             sender.SetField("cash", sender.GetField<int>("cash") - 500);
             hud.scorePopup(sender, -500);
             string icon = hud.createHudShaderString("cardicon_girlskull", false, 64, 64);
-            string senderMessage = icon + string.Format(AIZ.gameStrings[238], recipient) + icon;
+            string senderMessage = icon + string.Format(AIZ.gameStrings[238], recipient.Name) + icon;
             hud.scoreMessage(sender, senderMessage);
 
             recipient.SetField("cash", recipient.GetField<int>("cash") + 500);
             hud.scorePopup(recipient, 500);
-            string recipientMessage = icon + string.Format(AIZ.gameStrings[239], sender) + icon;
+            string recipientMessage = icon + string.Format(AIZ.gameStrings[239], sender.Name) + icon;
             hud.scoreMessage(recipient, recipientMessage);
         }
         #endregion
@@ -2349,7 +2365,7 @@ namespace AIZombiesSupreme
 
         public static void useBank(Entity player, bool isWithdraw)
         {
-            if (!hud.powerBox) return;//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
+            if (!hud.powerBox && !AIZ.isHellMap) return;//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
             if (player.SessionTeam != "allies" || !player.IsAlive) return;
             if (!isWithdraw)
             {
@@ -2371,7 +2387,7 @@ namespace AIZombiesSupreme
                 //Log.Write(LogLevel.All, "tmpBalance: {0}", totalBalance);
                 player.SetField("cash", player.GetField<int>("cash") - 1000);
                 hud.scorePopup(player, -1000);
-                hud.scoreMessage(player, AIZ.gameStrings[227]);
+                hud.scoreMessage(player, "Bank Deposit!");//Quick fix, no localized string for this for some reason
                 player.SetPlayerData("money", totalBalance);
                 player.IPrintLnBold(string.Format(AIZ.gameStrings[263], totalBalance));
             }
@@ -2482,8 +2498,10 @@ namespace AIZombiesSupreme
             players.PlayLocalSound("counter_uav_deactivate");
             yield return Wait(1);
 
-            if (roundSystem.isBossWave || (AIZ.isHellMap && !killstreaks.visionRestored)) players.VisionSetNakedForPlayer("cobra_sunset3", 1f);
-            else players.VisionSetNakedForPlayer(AIZ.vision, 1f);
+            if (!players.GetField<bool>("isDown") && !roundSystem.isBossWave) players.VisionSetNakedForPlayer(AIZ.vision, 1f);
+            else if (!players.GetField<bool>("isDown")) players.VisionSetNakedForPlayer(AIZ.bossVision, 1f);
+            else players.VisionSetNakedForPlayer("cheat_bw", 1f);
+
             PlayFX(AIZ.fx_teleportSpark, teleporter.Origin);
             players.SetOrigin(teleporter.Origin);
             //Vector3 teleporterAngles = teleporter.Angles;
@@ -2768,7 +2786,7 @@ namespace AIZombiesSupreme
                     else if (usable.GetField<bool>("isMoving")) return "";
                     else return AIZ.gameStrings[291];
                 case "bank":
-                    if (!hud.powerBox) return AIZ.gameStrings[282];//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
+                    if (!hud.powerBox && !AIZ.isHellMap) return AIZ.gameStrings[282];//BS 12/1/21 - Changing this to require the power box instead of power in favor of keeping EMPs from enabling this
                     else return AIZ.gameStrings[292];
                 case "perk1":
                     if (!AIZ.powerActivated) return AIZ.gameStrings[282];
@@ -2884,7 +2902,7 @@ namespace AIZombiesSupreme
                     if (usable.HasField("script_noteworthy")) return AIZ.gameStrings[318];
 
                     if (!player.HasWeapon(weapon) && cost != 0) return string.Format(AIZ.gameStrings[319], weaponName, cost, "[{+activate}]");
-                    else if (!player.HasWeapon(weapon) && cost == 0) return string.Format(AIZ.gameStrings[320], weaponName);
+                    else if (!player.HasWeapon(weapon) && cost == 0) return AIZ.gameStrings[320] + weaponName;
                     else return AIZ.gameStrings[316] + (cost/2);
                 case "helmet":
                     if (player.HasField("helmet") && player.GetField<bool>("helmet")) return "";
@@ -2896,7 +2914,6 @@ namespace AIZombiesSupreme
         #endregion
 
         #region moonutils
-        /*
         private static void spawnMoonHelmet(Vector3 location, Vector3 angles)
         {
             Entity helmet = Spawn("script_model", location);
@@ -2991,9 +3008,9 @@ namespace AIZombiesSupreme
             });
         }
 
-        private static void monitorMoonGravity(Entity bunkerZone, Entity bunkerEntranceZone, Entity bunkerMidZone, Entity backBuildingZone, Entity backHallwayZone, Entity buildingZone, Entity domeZone)
+        private static void monitorMoonGravity()
         {
-            OnInterval(100, () =>
+            OnInterval(500, () =>
             {
                 //Check for gravity and air here
                 //Glass values:
@@ -3010,42 +3027,127 @@ namespace AIZombiesSupreme
                 //105-107 = back entrance
                 //Dome:
                 //155-160
-                foreach (Entity players in Players)
+                foreach (Entity player in Players)
                 {
-                    if (!players.HasField("isDown")) continue;
-                    if (players.GetField<bool>("isDown")) continue;
+                    if (!IsAlive(player)) continue;
 
-                    if (players.IsTouching(backBuildingZone) || players.IsTouching(backHallwayZone) || players.IsTouching(buildingZone) ||
-                        players.IsTouching(bunkerZone) || players.IsTouching(bunkerMidZone) || players.IsTouching(bunkerEntranceZone) ||
-                        players.IsTouching(domeZone))
+                    if (player.IsTouching(moonTriggers[0]) || player.IsTouching(moonTriggers[1]) || player.IsTouching(moonTriggers[2]) ||
+                        player.IsTouching(moonTriggers[3]) || player.IsTouching(moonTriggers[4]) || player.IsTouching(moonTriggers[5]) ||
+                        player.IsTouching(moonTriggers[6]))
                     {
-                        if (players.HasField("moonGravity"))
+                        if (player.HasField("moonGravity"))
                         {
-                            players.UnSetPerk("specialty_jumpdive", true);
-                            players.ClearField("moonGravity");
+                            player.UnSetPerk("specialty_jumpdive", true);
+                            player.ClearField("moonGravity");
                         }
-                        if (!players.HasField("isInside"))
+                        if (!player.HasField("isInside"))
                         {
-                            players.Notify("helmet_on");
-                            players.SetField("isInside", true);
+                            player.Notify("helmet_on");
+                            player.SetField("isInside", true);
                         }
                     }
                     else
                     {
-                        if (players.HasField("isInside") && players.GetField<bool>("isInside"))
-                            players.ClearField("isInside");
-                        if (!players.HasField("moonGravity"))
+                        if (player.HasField("isInside") && player.GetField<bool>("isInside"))
+                            player.ClearField("isInside");
+                        if (!player.HasField("moonGravity"))
                         {
-                            players.SetPerk("specialty_jumpdive", true, true);
-                            players.SetField("moonGravity", true);
+                            player.SetPerk("specialty_jumpdive", true, true);
+                            player.SetField("moonGravity", true);
                         }
-                        if (!players.HasField("hasHelmetOn") && !players.HasField("isSuffocating"))
-                            StartAsync(suffocatePlayer(players));
+                        if (!player.HasField("hasHelmetOn") && !player.HasField("isSuffocating"))
+                            suffocatePlayer(player);
                     }
                 }
                 return true;
             });
         }
+        private static void suffocatePlayer(Entity player)
+        {
+            if (player.GetField<bool>("isDown")) return;
+
+            player.SetField("isSuffocating", true);
+            player.PlayLocalSound("breathing_heartbeat");
+
+            AfterDelay(3000, () =>
+            {
+                if (player.HasField("hasHelmetOn") || player.GetField<bool>("isDown") || player.HasField("isInside"))
+                {
+                    player.ClearField("isSuffocating");
+                    return;
+                }
+
+                player.IPrintLnBold(AIZ.gameStrings[324]);
+                player.PlayLocalSound("breathing_hurt");
+                player.SetBlurForPlayer(.5f, .25f);
+                AfterDelay(500, () =>
+                {
+                    player.SetBlurForPlayer(0, .25f);
+                    AfterDelay(3000, () =>
+                    {
+                        if (player.HasField("hasHelmetOn") || player.GetField<bool>("isDown") || player.HasField("isInside"))
+                        {
+                            player.ClearField("isSuffocating");
+                            player.PlayLocalSound("weap_sniper_breathout");
+                            return;
+                        }
+
+                        player.PlayLocalSound("breathing_heartbeat");
+                        player.SetBlurForPlayer(1f, .25f);
+                        AfterDelay(500, () =>
+                        {
+                            player.SetBlurForPlayer(0, .25f);
+                            AfterDelay(3000, () =>
+                            {
+                                if (player.HasField("hasHelmetOn") || player.GetField<bool>("isDown") || player.HasField("isInside"))
+                                {
+                                    player.ClearField("isSuffocating");
+                                    player.PlayLocalSound("weap_sniper_breathgasp");
+                                    return;
+                                }
+
+                                player.IPrintLnBold(AIZ.gameStrings[324]);
+                                player.PlayLocalSound("breathing_hurt");
+                                player.SetBlurForPlayer(1.5f, .25f);
+                                AfterDelay(500, () =>
+                                {
+                                    player.SetBlurForPlayer(0, .25f);
+                                    AfterDelay(3000, () =>
+                                    {
+                                        if (player.HasField("hasHelmetOn") || player.GetField<bool>("isDown") || player.HasField("isInside"))
+                                        {
+                                            player.ClearField("isSuffocating");
+                                            player.PlayLocalSound("weap_sniper_breathgasp");
+                                            return;
+                                        }
+
+                                        player.PlayLocalSound("breathing_hurt");
+                                        player.SetBlurForPlayer(2f, .25f);
+                                        AfterDelay(500, () =>
+                                        {
+                                            player.SetBlurForPlayer(0, .25f);
+                                            AfterDelay(3000, () =>
+                                            {
+                                                if (player.HasField("hasHelmetOn") || player.GetField<bool>("isDown") || player.HasField("isInside"))
+                                                {
+                                                    player.ClearField("isSuffocating");
+                                                    player.PlayLocalSound("weap_sniper_breathgasp");
+                                                    return;
+                                                }
+
+                                                player.FinishPlayerDamage(null, null, player.Health, 0, "MOD_FALLING", "none", player.Origin, Vector3.Zero, "j_neck", 0);
+                                                AfterDelay(50, () => player.ClearField("isSuffocating"));
+                                            });
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        }
+        /*
         private static IEnumerator suffocatePlayer(Entity player)
         {
             if (player.GetField<bool>("isDown")) yield break;
@@ -3167,6 +3269,9 @@ namespace AIZombiesSupreme
         {
             try
             {
+                if (checkExtraMaps(mapname))
+                    return;
+
                 maplist.Add("scripts\\aizombies\\maps\\" + mapname + ".map");
                 for (int i = 1; i < 11; i++)//Setup our filelist
                 {
@@ -3188,6 +3293,73 @@ namespace AIZombiesSupreme
             catch (Exception e)
             {
                 AIZ.printToConsole(AIZ.gameStrings[325], mapname, e.Message);
+            }
+        }
+        private static bool checkExtraMaps(string mapName)
+        {
+            if (AIZ.rng.Next(100) > 25)//25% chance of a new map
+                return false;
+
+            if (mapName == "mp_terminal_cls")
+            {
+                spawnMapEditObject("bank: (1753.916, 6313.605, 222.125) ; (90, -88.69812, 0)");
+                spawnMapEditObject("ammo: (1676.991, 5801.993, 207.125) ; (0, -266.6986, 0)");
+                spawnMapEditObject("killstreak: (2135.297, 5631.177, 207.125) ; (0, 89.25842, 0)");
+                spawnMapEditObject("pap: (2264.902, 6071.276, 207.125) ; (0, 0, 0)");
+                spawnMapEditObject("perk1: (2429.498, 5215.631, 222.125) ; (90, -270.6921, 0)");
+                spawnMapEditObject("perk7: (2729.5, 5680.35, 222.125) ; (90, -137.1478, 0)");
+                spawnMapEditObject("spawn: (1785.736, 6189.03, 192.125) ; (0, -38.21594, 0)");
+                spawnMapEditObject("spawn: (1781.029, 5813.608, 192.125) ; (0, 39.02893, 0)");
+                spawnMapEditObject("spawn: (2039.405, 6183.669, 192.125) ; (0, -130.6274, 0)");
+                spawnMapEditObject("spawn: (2077.577, 5833.555, 192.125) ; (0, 129.9463, 0)");
+                spawnMapEditObject("spawn: (2257.331, 5646.044, 192.125) ; (0, -47.80701, 0)");
+                spawnMapEditObject("spawn: (2585.548, 5644.205, 192.125) ; (0, -137.7411, 0)");
+                spawnMapEditObject("spawn: (2592.315, 5294.025, 192.125) ; (0, 132.2589, 0)");
+                spawnMapEditObject("spawn: (2283.95, 5302.396, 192.125) ; (0, 41.44592, 0)");
+                spawnMapEditObject("spawn: (2632.224, 5925.575, 192.125) ; (0, -135.9943, 0)");
+                spawnMapEditObject("zombiespawn: (1485.979, 6356.389, 192.125) ; (0, -90.03296, 0)");
+                spawnMapEditObject("zombiespawn: (1494.219, 5644.744, 192.125) ; (0, 89.62097, 0)");
+                spawnMapEditObject("zombiespawn: (2090.69, 5030.374, 192.125) ; (0, 0.7635498, 0)");
+                spawnMapEditObject("zombiespawn: (2778.992, 5039.324, 192.125) ; (0, -179.0387, 0)");
+                spawnMapEditObject("invisiblewall: (2134.626, 6025.601, 224.125) ; (2135.414, 6126.643, 302.2602)");
+                spawnMapEditObject("gambler: (1903.275, 6017.347, 239.625) ; (0, -181.8677, 0)");
+                spawnMapEditObject("invisiblewall: (2391.254, 6006.597, 230.125) ; (2170.693, 6008.345, 301.5245)");
+                spawnMapEditObject("invisiblewall: (2338.146, 6237.104, 192.125) ; (2266.125, 6237.368, 280.6372)");
+                spawnMapEditObject("doorandspawn: (2503.875, 6188.8, 239.9236) ; (2138.434, 6183.225, 192.125) ; (90, 176.862, 0) ; 2 ; 2 ; 100 ; 10000 ; (2413.63, 6290.377, 192.125) ; (0, 178.0719, 0)");
+                spawnMapEditObject("model:police_barrier_01; (2306.244, 6234.095, 192.125) ; (0, 0.01191906, 0)");
+                spawnMapEditObject("mapname:Burger Town Of Death");
+                spawnMapEditObject("hellMap:True");
+                spawnMapEditObject("maxWave:20");
+                spawnMapEditObject("randombox: (2793.336, 5440.894, 207.125) ; (0, -90.06592, 0) ; (1750.761, 6016.971, 207.125) ; (0, 89.6759, 0) ; (2386.846, 5730.87, 207.125) ; (0, 270.209, 0) ; (2430.531, 5773.469, 207.125) ; (0, 180.443, 0) ; (2131.326, 5285.379, 207.125) ; (0, 89.63745, 0)");
+                randomMap = 255;
+                return true;
+            }
+
+            return false;
+        }
+        private static Vector3[] checkExtraMapWaypoints()
+        {
+            switch (randomMap)
+            {
+                case 255:
+                    return new Vector3[] { new Vector3(2569.506f,5038.915f,192.125f),
+                                            new Vector3(2350.767f,5037.602f,192.125f),
+                                            new Vector3(2309.466f,5275.099f,192.125f),
+                                            new Vector3(2598.073f,5288.062f,192.125f),
+                                            new Vector3(2596.918f,5618.59f,192.125f),
+                                            new Vector3(2256.84f,5628.258f,192.125f),
+                                            new Vector3(2247.064f,5872.119f,192.125f),
+                                            new Vector3(2566.791f,5852.317f,192.125f),
+                                            new Vector3(2049.795f,5885.242f,192.125f),
+                                            new Vector3(2056.774f,6164.297f,192.125f),
+                                            new Vector3(1765.833f,6148.722f,192.125f),
+                                            new Vector3(1789.686f,5888.189f,192.125f),
+                                            new Vector3(1475.903f,5880.878f,192.125f),
+                                            new Vector3(1494.784f,6194.971f,192.125f),
+                                            new Vector3(2306.309f,6294.527f,192.125f),
+                                            new Vector3(2295.443f,6176.554f,192.125f) };
+                default:
+                    return null;
             }
         }
 
@@ -3441,13 +3613,13 @@ namespace AIZombiesSupreme
                     if (split.Length < 1) return;
                     SetMapCenter(AIZ.parseVec3(split[0]));
                     break;
+                case "spacehelmet":
+                    if (AIZ._mapname != "mp_dome") return;
+                    split = split[1].Split(';');
+                    if (split.Length < 2) return;
+                    spawnMoonHelmet(AIZ.parseVec3(split[0]), AIZ.parseVec3(split[1]));
+                    break;
                     /*
-            case "spacehelmet":
-                if (AIZ._mapname != "mp_dome") return;
-                split = split[1].Split(';');
-                if (split.Length < 2) return;
-                spawnMoonHelmet(AIZ.parseVec3(split[0]), AIZ.parseVec3(split[1]));
-                break;
             case "excavator":
                 if (AIZ._mapname != "mp_dome") return;
                 split = split[1].Split(';');
@@ -3490,6 +3662,22 @@ namespace AIZombiesSupreme
                         spawnModel("ap_table_destroyed_01", new Vector3(556, 2378, -254), new Vector3(67, 355, 0));
                         spawnModel("ap_table_destroyed_01", new Vector3(467, 2238, -255), new Vector3(56, 269, 0));
                         spawnModel("metal_hanging_strips_med_01", new Vector3(442, 1899, -191), new Vector3(10, 168, 0));
+
+                        //Roll a 50/50 for moon variant
+                        int cointoss = AIZ.rng.Next(100);
+                        if (cointoss % 2 == 0)
+                        {
+                            AIZ.zombieMapname = "Moonbase";
+                            spawnMapEditObject("spacehelmet: (563.909, 2194.27, -253.7606) ; (0, 264.3212, 0)");
+                            spawnMapEditObject("spacehelmet: (545.0822, 1920.188, -243.3936) ; (0, 86.3431, 0)");
+                            spawnMapEditObject("spacehelmet: (1443.034, 1166.74, -254.1329) ; (0, 83.2894, 0)");
+                            spawnMapEditObject("spacehelmet: (399.8792, -31.77756, -386.0158) ; (0, 182, 0)");
+                            spawnMapEditObject("spacehelmet: (-233.4409, 39.72492, -385.3513) ; (0, 23, 0)");
+
+                            //spawnMapEditObject("excavator: (-1303.499, -171.8676, 87.10009) ; (90, 352.4004, 0)");//Omicron
+
+                            initMoon();
+                        }
                     }
 
                     //Easter egg stuff
@@ -3642,6 +3830,7 @@ namespace AIZombiesSupreme
                 case "mp_terminal_cls":
                     yield return WaitForFrame();
                     if (AIZ.getZombieMapname() == "Airport Security")
+                    {
                         for (int i = 18; i < 1000; i++)
                         {
                             Entity ent = GetEntByNum(i);
@@ -3658,8 +3847,8 @@ namespace AIZombiesSupreme
                                 ent.Delete();
                             }
                         }
-                    /*
-                    else if (AIZ.getZombieMapname() == "Burger Town")
+                    }
+                    else if (AIZ.getZombieMapname() == "Burger Town Of Death")
                     {
                         Entity[] gates = new Entity[2];
                         for (int i = 18; i < 1000; i++)
@@ -3684,7 +3873,6 @@ namespace AIZombiesSupreme
 
                         StartAsync(terminal_buildGates(gates));
                     }
-                    */
                     break;
                 case "mp_italy":
                     yield return WaitForFrame();
@@ -3745,7 +3933,6 @@ namespace AIZombiesSupreme
                     break;
             }
         }
-        /*
         private static IEnumerator terminal_buildGates(Entity[] gates)
         {
             yield return Wait(.3f);
@@ -3809,7 +3996,6 @@ namespace AIZombiesSupreme
             foreach (Entity col in intro_col2)
                 col.Delete();
         }
-        */
         /*
         private static void domeEasterEgg(Entity trigger, Entity player)
         {
@@ -4013,7 +4199,6 @@ namespace AIZombiesSupreme
         };
 
         #region dome moon
-        /*
         public static void initDomeMoon()
         {
             Entity bunkerZone = Entity.GetEntity(550);
@@ -4033,25 +4218,21 @@ namespace AIZombiesSupreme
             backHallwayZone.WillNeverChange();
             buildingZone.WillNeverChange();
 
-            
-            AfterDelay(50, () =>
-            {
-                if (AIZ.getZombieMapname() == "Moonbase")
-                {
-                    AmbientStop();
-                    SetSunlight(new Vector3(-1, -1, 1));
-                    VisionSetNaked("cobra_sunset3");
-                    AIZ.vision = "cobra_sunset3";
-                    monitorMoonGravity(bunkerZone, bunkerEntranceZone, bunkerMidZone, backBuildingZone, backHallwayZone, buildingZone, domeZone);
-                }
-                //else
-                //{
-                    //backHallwayZone.Delete();
-                    //buildingZone.Delete();
-                    //bunkerMidZone.Delete();
-                //}
-                
-            });
+            moonTriggers[0] = bunkerZone;
+            moonTriggers[1] = bunkerEntranceZone;
+            moonTriggers[2] = bunkerMidZone;
+            moonTriggers[3] = backBuildingZone;
+            moonTriggers[4] = backHallwayZone;
+            moonTriggers[5] = buildingZone;
+            moonTriggers[6] = domeZone;
+        }
+        private static void initMoon()
+        {
+            AmbientStop();
+            SetSunlight(new Vector3(-1, -1, 1));
+            VisionSetNaked("cobra_sunset3");
+            AIZ.vision = "cobra_sunset3";
+            monitorMoonGravity();
 
             for (int i = 0; i < 2000; i++)
             {
@@ -4064,7 +4245,6 @@ namespace AIZombiesSupreme
                 }
             }
         }
-        */
         #endregion
 
         #region easter eggs

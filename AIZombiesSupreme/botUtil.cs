@@ -17,14 +17,15 @@ namespace AIZombiesSupreme
         public static List<Entity> glowsticks = new List<Entity>();
 
         public static uint botsForWave = 0;
-        public static int health = 105;
-        public static int crawlerHealth = 250;
-        public static int bossHealth = 5000;
-        public static int healthScalar = 5;
+        public static int health = 100;
+        public static int crawlerHealth = 110;
+        public static int bossHealth = 2500;
+        public static int healthScalar = 2;
         public static int dmg = 50;
         public static uint spawnedBots = 0;
         public static bool useAltHeads = false;
         public static bool useAltBodies = false;
+        public static bool useAlternatingThread = false;
 
         public static List<Vector3> botSpawns = new List<Vector3>();
         public static List<Vector3> spawnAngles = new List<Vector3>();
@@ -508,8 +509,7 @@ namespace AIZombiesSupreme
                 if (AIZ.isShotgun(weapon))
                 {
                     hitDamage = (int)(hitDamage * 14f);//Shotgun multiplier
-                    botHitbox.SetField("canBeDamaged", false);//Shotgun pellet delay. This fixes the bug where shotgun hits count every pellet for score
-                    AfterDelay(50, () => botHitbox.SetField("canBeDamaged", true));
+                    StartAsync(setBotImmunity(botHitbox));
                 }
 
                 if (weapon == "gl_mp") hitDamage = 10000;//GL
@@ -576,6 +576,13 @@ namespace AIZombiesSupreme
             player.PlayLocalSound("MP_hit_alert");
             combatHighFeedback.FadeOverTime(1);
             combatHighFeedback.Alpha = 0;
+        }
+
+        private static IEnumerator setBotImmunity(Entity bot)
+        {
+            bot.SetField("canBeDamaged", false);//Shotgun pellet delay. This fixes the bug where shotgun hits count every pellet for score
+            yield return WaitForFrame();
+            bot.SetField("canBeDamaged", true);
         }
 
         private static bool runBotBleedout(Entity player, Entity botHitbox)

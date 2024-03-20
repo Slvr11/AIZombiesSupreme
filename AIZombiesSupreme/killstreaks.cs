@@ -743,7 +743,7 @@ namespace AIZombiesSupreme
 
         public static IEnumerator launchMissile(Entity owner)
         {
-            hud.scoreMessage(owner, "Missile!");
+            hud.scoreMessage(owner, AIZ.gameStrings[302] + "!");
             owner.SetField("ownsPredator", false);
             //foreach (Entity player in Players)
             //if (AIZ.isPlayer(player)) 
@@ -1285,8 +1285,16 @@ namespace AIZombiesSupreme
 
         private static void spawnBotForPlayer(Entity owner, string weapon = "", int time = 0)
         {
-            if (weapon == botWeapon_subBot) owner.SetField("ownsSubBot", false);
-            else if (weapon == botWeapon_LMGBot) owner.SetField("ownsLMGBot", false);
+            if (weapon == botWeapon_subBot)
+            {
+                owner.SetField("ownsSubBot", false);
+                hud.scoreMessage(owner, AIZ.gameStrings[226] + "!");
+            }
+            else if (weapon == botWeapon_LMGBot)
+            {
+                owner.SetField("ownsLMGBot", false);
+                hud.scoreMessage(owner, AIZ.gameStrings[227] + "!");
+            }
             shuffleStreaks(owner);
 
             Entity bot = Spawn("script_model", owner.Origin);
@@ -2418,6 +2426,7 @@ namespace AIZombiesSupreme
         private static void startAcidRain(Entity player)
         {
             Announcement(AIZ.gameStrings[329]);
+            hud.scoreMessage(player, AIZ.gameStrings[234] + "!");
             mapStreakOut = true;
 
             foreach (Entity players in Players)
@@ -2889,6 +2898,8 @@ namespace AIZombiesSupreme
 
         private static void startMortarTeam(Entity owner)
         {
+            hud.scoreMessage(owner, AIZ.gameStrings[333] + "!");
+
             mapStreakOut = true;
 
             OnInterval(1750, () => runMortarTeam(owner));

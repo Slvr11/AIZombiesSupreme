@@ -133,6 +133,7 @@ namespace AIZombiesSupreme
             //player.SetPerk("specialty_bulletaccuracy", true, false);
             //player.SetClientDvar("ui_drawCrosshair", "0");
             player.SetSpreadOverride(1);
+            hud.updateAmmoHud(player, true, "iw5_pecheneg_mp_thermal_rof");
             yield return Wait(30);
 
             if (AIZ.isPlayer(player) && player.IsAlive)

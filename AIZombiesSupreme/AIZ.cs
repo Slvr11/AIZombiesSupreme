@@ -11,7 +11,7 @@ using System.Net;
 using InfinityScript;
 using static InfinityScript.GSCFunctions;
 
-//TODO: fix waypoint baking(some waypoints seem to bake through walls/to 0)
+//TODO: fix waypoint baking(some waypoints seem to bake through walls/to 0), fix bots being immortal, fix gametype string address to not require a scan
 
 namespace AIZombiesSupreme
 {
@@ -35,11 +35,11 @@ namespace AIZombiesSupreme
         public static readonly string bodyModel = getPlayerModelsForLevel(false);
         public static readonly string headModel = getPlayerModelsForLevel(true);
         public static readonly Random rng = new Random();
-        public static int maxPlayerHealth = 100;
-        public static int maxPlayerHealth_Jugg = 250;
+        public static int maxPlayerHealth = 101;
+        public static int maxPlayerHealth_Jugg = 251;
         public static bool powerActivated = false;
         public static bool tempPowerActivated = false;
-        public static readonly string version = "1.41";
+        public static readonly string version = "1.42";
         public static readonly string dev = "Slvr99";
 
         private static readonly int[] expectedDevResults = new int[100];//Set to 100 and generate results at runtime
@@ -232,7 +232,7 @@ namespace AIZombiesSupreme
             insertDevResults();
 
             //setNextMapRotate();
-            AfterDelay(50, () => patchGame());
+            AfterDelay(50, patchGame);
 
             killstreaks.initMapKillstreak();
             precacheGametype();
@@ -327,7 +327,6 @@ namespace AIZombiesSupreme
             SetDvar("missileJavDuds", 1);//Disable javelin explosions at close range
 
             SetDvarIfUninitialized("aiz_useMW2Visions", 0);
-            SetDvarIfUninitialized("sv_serverinfo_addr", "0");
             SetDvarIfUninitialized("aiz_appliedGamePatches", 0);
 
             PlayerConnected += onPlayerConnect;
@@ -370,8 +369,7 @@ namespace AIZombiesSupreme
                 mapEdit.maplist.Add(_mapname + ".map");
             }
 
-            if (File.Exists(mapEdit.maplist[mapEdit.randomMap].Replace(".map", ".wyp")))
-                mapEdit.createWaypoints();
+            mapEdit.createWaypoints();
 
             //OnInterval(100, runGameTimeoutReset);
 
@@ -383,7 +381,7 @@ namespace AIZombiesSupreme
 
                 mapEdit.dome_initEasterEgg();
 
-                //mapEdit.initDomeMoon();
+                mapEdit.initDomeMoon();
             }
 
             //init voting map table
@@ -644,8 +642,8 @@ namespace AIZombiesSupreme
                 giftTrigger.SetField("range", 40);
                 giftTrigger.SetField("usabletype", "giftTrigger");
                 player.SetField("giftTrigger", giftTrigger);
-                //mapEdit.usables.Add(giftTrigger);
-                mapEdit.usables.Insert(mapEdit.usables.Count, giftTrigger);
+                mapEdit.usables.Add(giftTrigger);
+                //mapEdit.usables.Insert(mapEdit.usables.Count, giftTrigger);
             }
         }
         private static void checkPlayerSpawn(Entity player)
@@ -972,6 +970,24 @@ namespace AIZombiesSupreme
                 SetDvar("aiz_appliedGamePatches", 0);
                 return EventEat.EatGame;
             }
+            else if (message.StartsWith("setSLMaxStrings"))
+            {
+                int newMaxLimit = hud.maxUnlocalizedConfigStrings;
+                if (int.TryParse(message.Split(' ')[1], out newMaxLimit))
+                {
+                    hud.maxUnlocalizedConfigStrings_danger = newMaxLimit;
+                    Announcement("String Library Max String Count has been set to " + newMaxLimit.ToString());
+                }
+            }
+            else if (message.StartsWith("setSLDangerZone"))
+            {
+                int newDangerZone = hud.maxUnlocalizedConfigStrings_danger;
+                if (int.TryParse(message.Split(' ')[1], out newDangerZone))
+                {
+                    hud.maxUnlocalizedConfigStrings_danger = newDangerZone;
+                    Announcement("String Library Danger Zone has been set to " + newDangerZone.ToString());
+                }
+            }
 
             return EventEat.EatNone;
         }
@@ -1173,7 +1189,6 @@ namespace AIZombiesSupreme
             //if (player == null) return;
 
             #region jump(moon)
-            /*
             else if (message == "jumped")
             {
                 Entity player = Entity.GetEntity(entRef);
@@ -1205,7 +1220,6 @@ namespace AIZombiesSupreme
                     }
                 }
             }
-            */
             #endregion
 
             #region reload
@@ -1293,14 +1307,12 @@ namespace AIZombiesSupreme
 
                     killstreaks.executeKillstreak(players, weapon);
 
-                    /*
                     if (weapon == "trophy_mp")
                     {
                         if (players.HasField("hasHelmetOn")) mapEdit.takeOffHelmet(players);
                         else mapEdit.putOnHelmet(players);
                         continue;
                     }
-                    */
 
                     if (players.GetField<bool>("ownsBot") && !isSpecialWeapon(weapon))
                     {
@@ -1913,9 +1925,6 @@ namespace AIZombiesSupreme
             AfterDelay(50, () => player.Notify("death"));//Remove the GSC counter
             player.PlaySound("freefall_death");
 
-            //if (getZombieMapname() == "Moonbase")
-                //player.Notify("helmet_on");
-
             //player.DisableOffhandWeapons();
             //player.DisableWeaponSwitch();
             player.FreezeControls(false);
@@ -2105,18 +2114,16 @@ namespace AIZombiesSupreme
                 HudElem message = player.GetField<HudElem>("hud_message");
                 hud._setText(message, "");
             }
-            /*
             if (getZombieMapname() == "Moonbase")
             {
                 if (player.HasField("hasHelmetOn"))
                 {
                     HudElem helmet = player.GetField<HudElem>("hud_helmet");
                     helmet.Destroy();
-                    player.SetField("hasHelmetOn", false);
+                    player.ClearField("hasHelmetOn");
                 }
                 if (player.HasField("helmet")) player.ClearField("helmet");
             }
-            */
 
             updatePlayerCountForScoreboard();
 
@@ -2233,7 +2240,7 @@ namespace AIZombiesSupreme
             string text = cfg.ReadToEnd();
             cfg.Close();
             cfg.Dispose();
-            if (!text.Split('\n')[0].StartsWith("//AIZombies Supreme v" + version.ToString() + " Config File//"))
+            if (!text.Split('\n')[0].StartsWith($"//AIZombies Supreme v{version} Config File//"))
                 cfgIsCurrent = false;
             string[] lines = formatCFGString(text);
             foreach (string line in lines)
@@ -2255,10 +2262,10 @@ namespace AIZombiesSupreme
                     newCfg.WriteLine("Spawn Weapon System: {0} //The type of weapon spawn. Valid options are 'Normal' and 'Random'.", spawnType == 1 ? "Random" : "Normal");
                     newCfg.WriteLine("Max Health: {0} //The normal max player health.", maxPlayerHealth);
                     newCfg.WriteLine("Max Juggernog Health: {0} //The max player health with juggernog.", maxPlayerHealth_Jugg);
-                    newCfg.WriteLine("Bot Starting Health: {0} //The starting health of a bot.", botUtil.health);
-                    newCfg.WriteLine("Crawler Health: {0} //The health of a crawler bot.", botUtil.crawlerHealth);
-                    newCfg.WriteLine("Boss Health: {0} //The health of a boss bot.", botUtil.bossHealth);
-                    newCfg.WriteLine("Bot Health Factor: {0} //The amount of health to add to bots every round", botUtil.healthScalar);
+                    newCfg.WriteLine("Bot Starting Health: {0} //The starting health of a bot.", 100);//These next four values will be hardcoded for new config files to fix most server values. This should be reverted next update!
+                    newCfg.WriteLine("Crawler Health: {0} //The health of a crawler bot.", 110);
+                    newCfg.WriteLine("Boss Health: {0} //The health of a boss bot.", 2500);
+                    newCfg.WriteLine("Bot Health Factor: {0} //The amount of health to add to bots every round", 2);
                     newCfg.WriteLine("Bot Damage: {0} //The amount of damage a bot does to a player", botUtil.dmg);
                     newCfg.WriteLine("Perk Drops: {0} //Allow perk bonus drops at the end of crawler rounds on hell maps", botUtil.perkDropsEnabled ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Map Voting: {0} //Enable or disable voting for the next map after a game has ended.", voting ? "Enabled" : "Disabled");
@@ -2322,31 +2329,22 @@ namespace AIZombiesSupreme
                     else printToConsole(gameStrings[34], botUtil.dmg);
                     break;
                 case "perkdrops":
-                    if (value == "enabled")
-                        botUtil.perkDropsEnabled = true;
-                    else if (value == "disabled")
-                        botUtil.perkDropsEnabled = false;
+                        botUtil.perkDropsEnabled = isValueEnabled(value);
                     break;
                 case "mapvoting":
-                    if (value == "enabled")
-                        voting = true;
-                    else if (value == "disabled")
-                        voting = false;
+                        voting = isValueEnabled(value);
                     break;
                 case "dlcmaps":
-                    if (value == "enabled")
-                        dlcEnabled = true;
-                    else if (value == "disabled")
-                        dlcEnabled = false;
+                        dlcEnabled = isValueEnabled(value);
                     break;
-                    /*
+                /*
                 case "altweaponnames":
-                    if (value == "enabled")
+                    if (isEnabled(value))
                         altWeaponNames = true;
-                    else if (value == "disabled")
+                    else
                         altWeaponNames = false;
                     break;
-                    */
+                */
                 case "perklimit":
                     byte setB;
                     if (byte.TryParse(value, out setB))
@@ -2354,28 +2352,21 @@ namespace AIZombiesSupreme
                     else printToConsole(gameStrings[35], perkLimit);
                     break;
                 case "autoupdates":
-                    if (value == "enabled")
-                        autoUpdate = true;
-                    else if (value == "disabled")
-                        autoUpdate = false;
+                        autoUpdate = isValueEnabled(value);
                     break;
                 case "customservergametype":
-                    if (value == "enabled")
-                        allowServerGametypeHack = true;
-                    else if (value == "disabled")
-                        allowServerGametypeHack = false;
+                        allowServerGametypeHack = isValueEnabled(value);
                     break;
                 case "customgametype":
-                    if (value == "enabled")
-                        allowGametypeHack = true;
-                    else if (value == "disabled")
-                        allowGametypeHack = false;
+                        allowGametypeHack = isValueEnabled(value);
                     break;
                 case "gamelanguage":
                     gameLanguage = value.ToLower();
                     break;
             }
         }
+        private static bool isValueEnabled(string value)
+            => value == "enabled" || value == "1";
 
         public static void printToConsole(string format, params Parameter[] p)
         {
@@ -3267,76 +3258,6 @@ namespace AIZombiesSupreme
 
             crate.SetField("fx_xmas", new Parameter(fx));
         }
-
-        private static void spawnSnow()
-        {
-            int snow;
-            if (_mapname == "mp_dome")
-            {
-                snow = LoadFX("dust/light_shaft_dust_large_mp_vacant");
-                foreach (Entity player in Players)
-                {
-                    player.SpawnedPlayer += () => runSnowFX(player, snow);
-                    //player.OnNotify("spawned_player", (p) => runSnowFX(player, snow));
-                }
-            }
-        }
-
-        private static void runSnowFX(Entity player, int snow)
-        {
-            if (player.HasField("isSnowing")) return;
-            player.SetField("isSnowing", true);
-
-            Utilities.PrintToConsole("Starting snow for " + player.Name);
-
-            Entity[] snowArea = new Entity[6];
-            for (int i = 0; i < 6; i++)
-            {
-                Vector3 offset = new Vector3(0, 0, 0);
-                switch (i)
-                {
-                    case 0:
-                        offset = new Vector3(100, 100, 0);
-                        break;
-                    case 1:
-                        offset = new Vector3(-100, 100, 0);
-                        break;
-                    case 2:
-                        offset = new Vector3(100, -100, 0);
-                        break;
-                    case 3:
-                        offset = new Vector3(-100, -100, 0);
-                        break;
-                    case 4:
-                        offset = new Vector3(100, 0, 0);
-                        break;
-                    case 5:
-                        offset = new Vector3(-100, 0, 0);
-                        break;
-                }
-                Entity snowFx = SpawnFX(snow, player.GetEye() + offset);
-                snowFx.SetField("offset", offset);
-                snowArea[i] = snowFx;
-            }
-
-            OnInterval(1000, () =>
-            {
-                foreach (Entity fx in snowArea)
-                {
-                    fx.Origin = player.GetEye() + fx.GetField<Vector3>("offset");
-                    TriggerFX(fx);
-                }
-                return true;
-            });
-        }
-
-        public static void playThankYou(Entity player)
-        {
-            if (!isPlayer(player) || !player.IsAlive) return;
-
-            player.PlayLocalSound("");
-        }
-
         private static bool watchForBallDrop(Entity ball, Vector3 basePos)
         {
             TimeSpan time = DateTime.Today.TimeOfDay;
@@ -3520,103 +3441,54 @@ namespace AIZombiesSupreme
         private void patchGame()
         {
             //This function is used to patch memory for certain features/tweaks
+            memoryScanning.Mem.InitMemory();
 
             //Gametype setup
-            if (allowServerGametypeHack) AfterDelay(1000, () => memoryScanning.writeToServerInfoString(0x00400000, 0x10000000));
-            if (allowGametypeHack) AfterDelay(50, () => memoryScanning.writeGameInfoString());
+            if (allowServerGametypeHack) AfterDelay(100, memoryScanning.writeToServerInfoString);
+            if (allowGametypeHack) AfterDelay(1000, memoryScanning.writeGameInfoString);
 
-            if (GetDvarInt("aiz_appliedGamePatches") == 0) AfterDelay(5000, () => memoryScanning.searchWeaponPatchPtrs());//After 5 seconds because these patches stick the entire server lifetime and don't need to be time-sensitive. Waiting for server info string search
-
-            //Migrating patches to memory scanning to scan for dynamic addresses
-            /*
-            //weapon stock values
-            //*(int*)0x12EDB8A4 = 2;//UAV Strike Marker stock
-            Marshal.WriteInt32(new IntPtr(0x12EDB8A4), 2);
-            //*(int*)0x1303BFC0 = 20;//AT4 stock
-            Marshal.WriteInt32(new IntPtr(0x1303BFC0), 8);
-            //*(int*)0x14742F5C = 8;//Stinger stock
-            Marshal.WriteInt32(new IntPtr(0x14742F5C), 8);
-            //*(int*)0x1471C17C = 12;//iw5_xm25 stock
-            Marshal.WriteInt32(new IntPtr(0x1471C17C), 8);
-            //*(int*)0x13029E3C = 20;//gl_mp stock
-            Marshal.WriteInt32(new IntPtr(0x13029E3C), 8);
-            //*(int*)0x2288E100 = 12;//Javelin stock
-            //*(int*)0x12F2A090 = 24;//Javelin upgrade stock
-            //misc weapon patches
-            //*(bool*)0x147434A2 = false;//Stinger requireLockOn
-            Marshal.WriteByte(new IntPtr(0x147434A2), 0);
-            //*(bool*)0x147434B4 = false;//Stinger adsFire
-            Marshal.WriteByte(new IntPtr(0x147434B4), 0);
-            //*(bool*)0x147434C2 = false;//Stinger projImpactExplode
-            Marshal.WriteByte(new IntPtr(0x147434C2), 0);
-            //*(bool*)0x12EDBDED = false;//F2000 noAdsWhenMagEmpty
-            Marshal.WriteByte(new IntPtr(0x12EDBDED), 0);
-            //*(bool*)0x12EDBDFC = false;//F2000 adsFire
-            Marshal.WriteByte(new IntPtr(0x12EDBDFC), 0);
-            //*(bool*)0x2288E646 = false;//Javelin requireLockOn
-            //*(bool*)0x2288E650 = false;//Javelin aimDownSight
-            //*(bool*)0x2288E658 = false;//Javelin adsFire
-            //*(bool*)0x2288E666 = false;//Javelin projImpactExplode
-            //*(bool*)0x12F1B698 = false;//Javelin2 aimDownSight
-            Marshal.WriteByte(new IntPtr(0x12F1B698), 0);
-            //*(bool*)0x12F1B6A0 = false;//Javelin2 adsFire
-            Marshal.WriteByte(new IntPtr(0x12F1B6A0), 0);
-            //*(bool*)0x12F1B6AE = false;//Javelin2 projImpactExplode
-            Marshal.WriteByte(new IntPtr(0x12F1B6AE), 0);
-            //*(bool*)0x12F2A5D6 = false;//Javelin upgrade requireLockOn
-            Marshal.WriteByte(new IntPtr(0x12F2A5D6), 0);
-            //*(bool*)0x12F2A5E0 = false;//Javelin upgrade aimDownSight
-            Marshal.WriteByte(new IntPtr(0x12F2A5E0), 0);
-            //*(bool*)0x12F2A5E8 = false;//Javelin upgrade adsFire
-            Marshal.WriteByte(new IntPtr(0x12F2A5E8), 0);
-            //*(bool*)0x12F2A5F6 = false;//Javelin upgrade projImpactExplode
-            Marshal.WriteByte(new IntPtr(0x12F2A5F6), 0);
-            //*(int*)0x12B315D8 = 0;//Sentry gun damage
-            Marshal.WriteInt32(new IntPtr(0x12B315D8), 0);
-            Marshal.WriteInt32(new IntPtr(0x12B31A3C), 0);//Sentry ranged damage
-            //*(int*)0x14514CE0 = 2;//USP fireType grenade
-            //*(int*)0x14109694 = 1;//MK12 weaponType sniper
-            //*(int*)0x13F7D6E4 = 1;//Dragunov weaponType sniper
-            */
+            if (GetDvarInt("aiz_appliedGamePatches") == 0) memoryScanning.writeWeaponPatches();
         }
 #region memory scanning
         public class memoryScanning
         {
-            //[DllImport("kernel32.dll")]
-            //private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, IntPtr buffer, uint size, int lpNumberOfBytesRead);
-            //[DllImport("kernel32.dll")]
-            //private static extern bool WriteProcessMemory(IntPtr hProcess, int lpBaseAddress, [In, Out] byte[] buffer, uint size, out int lpNumberOfBytesWritten);
-            [DllImport("kernel32.dll")]
-            private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] buffer, uint size, int lpNumberOfBytesRead);
-            [DllImport("kernel32.dll")]
-            private static extern int VirtualQuery(IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
-            //[DllImport("kernel32.dll")]
-            //private static extern bool VirtualProtect(IntPtr lpAddress, uint dwSize, uint flNewProtect, out uint lpflOldProtect);
-            [StructLayout(LayoutKind.Sequential)]
-            private struct MEMORY_BASIC_INFORMATION
-            {
-                public IntPtr BaseAddress;
-                public IntPtr AllocationBase;
-                public uint AllocationProtect;
-                public IntPtr RegionSize;
-                public uint State;
-                public uint Protect;
-                public uint Type;
-            }
             private static Dictionary<string, List<IntPtr>> weaponStructs = new Dictionary<string, List<IntPtr>>();
             private static string[] weaponPatches = new string[] { "uav_strike_marker_mp", "at4_mp", "stinger_mp", "iw5_xm25_mp", "gl_mp", "uav_strike_missile_mp", "uav_strike_projectile_mp", "sentry_minigun_mp", killstreaks.botWeapon_subBot, killstreaks.botWeapon_LMGBot, "iw5_skorpion_mp" };
             private static List<IntPtr> raygunFireRatePtrs = new List<IntPtr>();
+            private static int baseAddress = 0x0;
+            private static int serverInfoStringAddress = 0x0;
 
             public static class Mem
             {
+                public static void InitMemory()
+                {
+                    SetDvarIfUninitialized("sv_serverInfoStringAddress", 0);
+                    serverInfoStringAddress = GetDvarInt("sv_serverInfoStringAddress");
+
+                    int baseAddressDvar = GetDvarInt("sv_baseAddress");
+                    if (baseAddressDvar != 0)
+                    {
+                        baseAddress = baseAddressDvar;
+                    }
+                    else
+                    {
+                        Process thisProcess = Process.GetCurrentProcess();
+                        ProcessModule thisModule = thisProcess.MainModule;
+                        baseAddress = thisModule.BaseAddress.ToInt32();
+                        SetDvarIfUninitialized("sv_baseAddress", baseAddress);
+                        thisProcess.Dispose();
+                    }
+                }
                 public static string ReadString(int address, int maxlen = 0)
+                    => ReadString(new IntPtr(address), maxlen);
+                public static string ReadString(IntPtr address, int maxlen = 0)
                 {
                     string ret = "";
                     maxlen = (maxlen == 0) ? int.MaxValue : maxlen;
 
                     byte[] buffer = new byte[maxlen];
 
-                    ReadProcessMemory(Process.GetCurrentProcess().Handle, new IntPtr(address), buffer, (uint)maxlen, 0);
+                    Marshal.Copy(address, buffer, 0, maxlen);
 
                     ret = Encoding.ASCII.GetString(buffer);
 
@@ -3625,257 +3497,84 @@ namespace AIZombiesSupreme
 
                 public static void WriteString(IntPtr address, string str, bool endZero = true)
                 {
-                    if (!canReadAndWriteMemory(address, 1024)) return;
+                    //if (!canReadAndWriteMemory(address, 1024)) return;
 
                     byte[] strarr = Encoding.ASCII.GetBytes(str);
 
                     Marshal.Copy(strarr, 0, address, strarr.Length);
                     if (endZero) Marshal.WriteByte(address + str.Length, 0);
                 }
-                public static bool canReadMemory(IntPtr address, uint length)
-                {
-                    MEMORY_BASIC_INFORMATION mem;
-                    VirtualQuery(address, out mem, length);
-
-                    if (mem.Protect == 0x40 || mem.Protect == 0x04 || mem.Protect == 0x02) return true;
-                    return false;
-                }
-                public static bool canReadAndWriteMemory(IntPtr address, uint length)
-                {
-                    MEMORY_BASIC_INFORMATION mem;
-                    VirtualQuery(address, out mem, length);
-
-                    if (/*mem.Protect == 0x40 || */mem.Protect == 0x04) return true;
-                    return false;
-                }
                 public static IntPtr getProcessBaseAddress()
                     => Process.GetCurrentProcess().MainModule.BaseAddress;
-            }
-            public static List<IntPtr> scanForServerInfo(int min, int max)
-            {
-                Process p = Process.GetCurrentProcess();
-                List<IntPtr> ptrs = new List<IntPtr>();
-                IntPtr currentAddr = new IntPtr(min);
-                byte[] buffer = new byte[1024];
-                string s = null;
-                string test = @"gn\IW4\gt\aiz";
-                string key = "gn\\IW5\\gt\\";
-
-                for (; (int)currentAddr < max; currentAddr += 1024)
-                {
-                    if (!Mem.canReadMemory(currentAddr, 1024)) continue;
-
-                    s = null;
-                    ReadProcessMemory(p.Handle, currentAddr, buffer, 1024, 0);
-                    s = Encoding.ASCII.GetString(buffer);//Mem.ReadString(currentAddr, 512);
-
-                    if (!string.IsNullOrEmpty(s))
-                    {
-                        //Utilities.PrintToConsole("Address " + currentAddr.ToString("X"));
-                        if (s.Contains(key))
-                        {
-                            int offset = s.IndexOf("gn");
-                            //Utilities.PrintToConsole("Address Found " + (currentAddr + offset).ToString("X"));
-                            //Check if we have write access
-                            if (!Mem.canReadAndWriteMemory(currentAddr + offset, 1024)) continue;
-                            //Find out if this is real or not
-                            Mem.WriteString(currentAddr + offset, test, false);
-                            System.Threading.Thread.Sleep(50);
-                            byte[] returnBuffer = new byte[test.Length];
-                            ReadProcessMemory(p.Handle, currentAddr + offset, returnBuffer, 13, 0);
-                            string returned = Encoding.ASCII.GetString(returnBuffer);
-                            //Utilities.PrintToConsole(GetTime().ToString() + ": " + returned);
-
-                            if (test == returned)
-                            {
-                                ptrs.Add(currentAddr + offset);
-                                /*
-                                MEMORY_BASIC_INFORMATION mem;
-                                VirtualQuery(currentAddr + offset, out mem, 1024);
-                                Utilities.PrintToConsole("Adding ptr " + (currentAddr + offset).ToString("X") + ", with protect " + mem.Protect.ToString("X"));
-                                */
-                            }
-                        }
-                    }
-
-                    //for (int i = 0; i < buffer.Length; i++)
-                        //buffer[i] = 0;//Clear buffer from memory footprint
-
-                }
-                return ptrs;
+                public static int getPtrAtLoc(int loc)
+                    => Marshal.ReadInt32(new IntPtr(loc));
             }
             public static List<IntPtr> scanForGameInfo()
             {
-                Process p = Process.GetCurrentProcess();
                 List<IntPtr> ptrs = new List<IntPtr>();
-                IntPtr currentAddr = new IntPtr(0x01A00000);//1A for now
-                byte[] buffer = new byte[512];
+                IntPtr currentAddr = new IntPtr(0x01B00000);
+                int bufferSize = 512;
+                byte[] buffer = new byte[bufferSize];
                 string s = null;
-                string key = "\\g_gametype\\war\\g_hardcore\\";
+                string key = @"\g_gametype\war\g_hardcore\";
 
-                for (; (int)currentAddr < 0x01D00000; currentAddr+= 512)
+                for (; (int)currentAddr < 0x01D00000; currentAddr += bufferSize)
                 {
-                    if (!Mem.canReadMemory(currentAddr, 512)) continue;
+                    //if (!Mem.canReadMemory(currentAddr, (uint)bufferSize)) continue;
 
                     s = null;
-                    //IntPtr buffer = Marshal.AllocHGlobal(512);
-                    ReadProcessMemory(p.Handle, currentAddr, buffer, 512, 0);
+                    Marshal.Copy(currentAddr, buffer, 0, bufferSize);
                     s = Encoding.ASCII.GetString(buffer);//Mem.ReadString(currentAddr, 512);
 
                     if (!string.IsNullOrEmpty(s))
                     {
                         //Utilities.PrintToConsole("Address " + currentAddr.ToString("X"));
-                        if (s.Contains(key))
+                        if (s.Contains(key) && s.Contains(_mapname))
                         {
                             int offset = s.IndexOf("\\g_gametype");
-                            /*
-                            MEMORY_BASIC_INFORMATION mem;
-                            VirtualQuery(currentAddr + offset, out mem, 1024);
-                            Utilities.PrintToConsole("Adding ptr " + (currentAddr + offset).ToString("X") + ", with protect " + mem.Protect.ToString("X"));
-                            */
+
+                            //if (Marshal.ReadInt32(new IntPtr(currentAddr.ToInt32() + offset - 0x04)) != 1)
+                                //continue;
+
+                            //Utilities.PrintToConsole("Adding game ptr " + (currentAddr + offset).ToString("X"));
+                            
                             ptrs.Add(currentAddr + offset);
                         }
                     }
                 }
+
                 return ptrs;
-            }
-
-            public static void scanForWeaponStructs()
-            {
-                //Utilities.PrintToConsole("Searching for weapon structs...");
-
-                Process p = Process.GetCurrentProcess();
-                IntPtr currentAddr = new IntPtr(0x10000000);//Start the scan at 10 for now
-                byte[] buffer = new byte[1024];
-                string s = null;
-
-                for (; (int)currentAddr < 0x18000000; currentAddr += 1024)
-                {
-                    if (!Mem.canReadMemory(currentAddr, 1024)) continue;
-
-                    s = null;
-                    ReadProcessMemory(p.Handle, currentAddr, buffer, 1024, 0);
-                    s = Encoding.ASCII.GetString(buffer);
-
-                    if (!string.IsNullOrEmpty(s))
-                    {
-                        //Utilities.PrintToConsole("Address " + currentAddr.ToString("X"));
-                        for (int i = 0; i < weaponPatches.Length; i++)
-                        {
-                            if (s.Contains(weaponPatches[i]))
-                            {
-                                int offset = s.IndexOf(weaponPatches[i]);
-                                weaponStructs[weaponPatches[i]].Add(currentAddr + offset);
-                                //Utilities.PrintToConsole("Address " + (currentAddr + offset) + " found for weapon struct " + weaponPatches[i]);
-                            }
-                        }
-                    }
-                }
-
-                //search for raygun firerate
-                currentAddr = new IntPtr(0x00100000);
-                foreach (IntPtr skorpionPtr in weaponStructs["iw5_skorpion_mp"])
-                {
-                    int currentPtr = skorpionPtr.ToInt32();
-                    for (; (int)currentAddr < 0x10000000; currentAddr += 1024)
-                    {
-                        if (!Mem.canReadMemory(currentAddr, 1024)) continue;
-
-                        ReadProcessMemory(p.Handle, currentAddr, buffer, 1024, 0);
-
-                        //Utilities.PrintToConsole("Address " + currentAddr.ToString("X"));
-                        for (int i = 0; i < buffer.Length; i += 4)
-                        {
-                            int bufferInt = BitConverter.ToInt32(buffer, i);
-                            if (bufferInt == currentPtr)
-                            {
-                                raygunFireRatePtrs.Add(currentAddr + i);
-                            }
-                        }
-                    }
-                }
-            }
-
-            public static void scanServerInfo(object sender, DoWorkEventArgs e)
-            {
-                int[] arguments = e.Argument as int[];
-                e.Result = scanForServerInfo(arguments[0], arguments[1]);
             }
             public static void scanGameInfo(object sender, DoWorkEventArgs e)
             {
                 e.Result = scanForGameInfo();
             }
-            public static void scanWeaponStructs(object sender, DoWorkEventArgs e)
+            public static void writeToServerInfoString()
             {
-                scanForWeaponStructs();
-            }
-
-            public static void searchWeaponPatchPtrs()
-            {
-                //init structs dictionary
-                foreach (string weapon in weaponPatches)
-                    weaponStructs.Add(weapon, new List<IntPtr>());
-
-                BackgroundWorker task = new BackgroundWorker();
-                task.DoWork += scanWeaponStructs;
-                task.RunWorkerAsync();
-
-                task.RunWorkerCompleted += new RunWorkerCompletedEventHandler(scanWeaponStructs_Completed);
-                task.RunWorkerCompleted += new RunWorkerCompletedEventHandler((s, e) => task.Dispose());
-            }
-            public static void writeToServerInfoString(int min, int max)
-            {
-                string sv_serverinfo_addr = GetDvar("sv_serverinfo_addr");
-                if (string.IsNullOrEmpty(sv_serverinfo_addr) || sv_serverinfo_addr == "0") //first start
+                if (serverInfoStringAddress == 0)
                 {
-                    BackgroundWorker task = new BackgroundWorker();
-                    task.DoWork += scanServerInfo;
-                    task.RunWorkerAsync(new int[2] { min, max });
-
-                    task.RunWorkerCompleted += new RunWorkerCompletedEventHandler(scanServerInfo_Completed);
-                    task.RunWorkerCompleted += new RunWorkerCompletedEventHandler((s, e) => task.Dispose());
-                }
-                else
-                {
-                    //skip search, just load from sdvar
-                    string[] parts = sv_serverinfo_addr.Split(' ');
-                    int[] addrs = Array.ConvertAll(parts, int.Parse);
-                    if (addrs.Length > 0)
+                    int infoStringAddress = Marshal.ReadInt32(new IntPtr(0x0013DD0C));
+                    if (infoStringAddress == 0x0 || infoStringAddress > 0x08000000 || infoStringAddress < 0x04000000)
                     {
-                        for (int i = 50; i <= addrs.Length * 50; i += 50)
-                        {
-                            int index = (i / 50) - 1;
-                            int addr = addrs[index];
-                            //Log.Debug("Setting addr {0} with delay of {1}", addr.ToString("X"), i);
-                            AfterDelay(1000 + i, () => setGametype(addr));
-                        }
+                        AfterDelay(50, memoryScanning.writeToServerInfoString);
+                        return;
                     }
-                }
-            }
-            private static void scanServerInfo_Completed(object sender, RunWorkerCompletedEventArgs e)
-            {
-                if (e.Cancelled)
-                {
-                    Utilities.PrintToConsole(gameStrings[74]);
-                    return;
-                }
-                if (e.Error != null)
-                {
-                    Utilities.PrintToConsole(gameStrings[75] + e.Error.Message);
-                    return;
+                    infoStringAddress--;
+                    serverInfoStringAddress = infoStringAddress;
+                    SetDvar("sv_serverInfoStringAddress", serverInfoStringAddress);
                 }
 
-                List<IntPtr> addrs = e.Result as List<IntPtr>;
-                if (addrs.Count == 0)
-                {
-                    Utilities.PrintToConsole(gameStrings[76]);
-                    return;
-                }
+                //Utilities.PrintToConsole("Server gametype string addr: " + (serverInfoStringAddress).ToString("X"));
+                string output = Mem.ReadString(serverInfoStringAddress, 9);
+                //Utilities.PrintToConsole("Server Output: " + output);
 
-                setServerInfoPtrs(addrs);
+                if (output.StartsWith(@"gn\IW5\gt"))
+                    memoryScanning.Mem.WriteString(new IntPtr(serverInfoStringAddress), modeText);
             }
+            
             private static void scanGameInfo_Completed(object sender, RunWorkerCompletedEventArgs e)
             {
+                ((BackgroundWorker)sender).Dispose();
                 if (e.Cancelled)
                 {
                     Utilities.PrintToConsole(gameStrings[77]);
@@ -3893,7 +3592,7 @@ namespace AIZombiesSupreme
                     Utilities.PrintToConsole(gameStrings[79]);
                     return;
                 }
-
+                
                 if (addrs.Count != 0)
                 {
                     for (int i = 0; i < gameInfo.Length && i < addrs.Count; i++)
@@ -3903,151 +3602,135 @@ namespace AIZombiesSupreme
                     }
                     if (connectingPlayers > 0) writeGameInfo();
                 }
+                
             }
-            private static void scanWeaponStructs_Completed(object sender, RunWorkerCompletedEventArgs e)
-            {
-                //Utilities.PrintToConsole("Searching for weapon structs complete.");
-                if (e.Cancelled)
-                {
-                    Utilities.PrintToConsole(gameStrings[82]);
-                    return;
-                }
-                if (e.Error != null)
-                {
-                    Utilities.PrintToConsole(gameStrings[83] + e.Error.Message);
-                    return;
-                }
-
-                writeWeaponPatches();
-            }
-
-            private static void setServerInfoPtrs(List<IntPtr> addrs)
-            {
-                //Log.Debug(string.Join(", ", addrs));
-                if (addrs.Count > 0)
-                {
-                    //save found address(es)
-                    string addrDvar = string.Join(" ", addrs);
-                    SetDvar("sv_serverinfo_addr", addrDvar);
-                    for (int i = 50; i <= addrs.Count * 50; i += 50)
-                    {
-                        //Log.Debug("Count {2} Addr {0} at i {1}", (i / 50) - 1, i, addrs.Count);
-                        int index = (i / 50) - 1;
-                        int addr = addrs[index].ToInt32();
-                        //Log.Debug("Setting addr {0} with delay of {1}", addr.ToString("X"), i);
-                        AfterDelay(i, () => setGametype(addr));
-                    }
-                    //foreach (IntPtr addr in addrs) AfterDelay(1000, () => setGametype((int)addr));
-                }
-                else
-                {
-                    Utilities.PrintToConsole(gameStrings[84]);
-                    return;
-                }
-            }
-            private static void writeWeaponPatches()
+            public static void writeWeaponPatches()
             {
                 //Utilities.PrintToConsole("Writing weapon patches");
 
-                List<IntPtr> currentPtrs;
-                for (int i = 0; i < weaponPatches.Length; i++)
+                IntPtr weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x012B35C8));
+                string weaponName = Mem.ReadString(weaponLoc, 10);
+                if (weaponName == "stinger_mp")
                 {
-                    if (!weaponStructs.ContainsKey(weaponPatches[i]))
-                    {
-                        Utilities.PrintToConsole(string.Format(gameStrings[85], weaponPatches[i]));
-                        continue;
-                    }
+                    //Utilities.PrintToConsole(weaponName);
+                    //Stock value
+                    Marshal.WriteInt32(weaponLoc + 0x230, 8);
+                    //requireLockOn
+                    Marshal.WriteByte(weaponLoc + 0x776, 0);
+                    //adsFire
+                    Marshal.WriteByte(weaponLoc + 0x788, 0);
+                    //projImpactExplode
+                    Marshal.WriteByte(weaponLoc + 0x796, 0);
+                }
 
-                    currentPtrs = weaponStructs[weaponPatches[i]];
-                    foreach (IntPtr ptr in currentPtrs)
-                    {
-                        //Utilities.PrintToConsole("Writing patches for " + weaponPatches[i] + " (" + ptr.ToString("X") + ")");
-                        if (weaponPatches[i] == "uav_strike_marker_mp")
-                        {
-                            //Stock value
-                            if (Marshal.ReadInt32(ptr + 0x239) == 1) Marshal.WriteInt32(ptr + 0x239, 2);
-                            //noAdsWhenMagEmpty
-                            if (Marshal.ReadByte(ptr + 0x782) == 1) Marshal.WriteByte(ptr + 0x782, 0);
-                            //adsFire
-                            if (Marshal.ReadByte(ptr + 0x791) == 1) Marshal.WriteByte(ptr + 0x791, 0);
-                        }
-                        else if (weaponPatches[i] == "at4_mp")
-                        {
-                            //Stock value
-                            if (Marshal.ReadInt32(ptr + 0x22E) == 1) Marshal.WriteInt32(ptr + 0x22E, 8);
-                        }
-                        else if (weaponPatches[i] == "stinger_mp")
-                        {
-                            //Stock value
-                            if (Marshal.ReadInt32(ptr + 0x230) == 1) Marshal.WriteInt32(ptr + 0x230, 8);
-                            //requireLockOn
-                            if (Marshal.ReadByte(ptr + 0x776) == 1) Marshal.WriteByte(ptr + 0x776, 0);
-                            //adsFire
-                            if (Marshal.ReadByte(ptr + 0x788) == 1) Marshal.WriteByte(ptr + 0x788, 0);
-                            //projImpactExplode
-                            if (Marshal.ReadByte(ptr + 0x796) == 1) Marshal.WriteByte(ptr + 0x796, 0);
-                        }
-                        else if (weaponPatches[i] == "iw5_xm25_mp")
-                        {
-                            //Stock value
-                            if (Marshal.ReadInt32(ptr + 0x230) == 6) Marshal.WriteInt32(ptr + 0x230, 8);
-                        }
-                        else if (weaponPatches[i] == "gl_mp")
-                        {
-                            //Stock value
-                            if (Marshal.ReadInt32(ptr + 0x22B) == 1) Marshal.WriteInt32(ptr + 0x22B, 8);
-                        }
-                        else if (weaponPatches[i] == "uav_strike_missile_mp")
-                        {
-                            //aimDownSight
-                            if (Marshal.ReadByte(ptr + 0x78C) == 1) Marshal.WriteByte(ptr + 0x78C, 0);
-                            //adsFire
-                            if (Marshal.ReadByte(ptr + 0x794) == 1) Marshal.WriteByte(ptr + 0x794, 0);
-                            //projImpactExplode
-                            if (Marshal.ReadByte(ptr + 0x7A2) == 1) Marshal.WriteByte(ptr + 0x7A2, 0);
-                        }
-                        else if (weaponPatches[i] == "uav_strike_projectile_mp")
-                        {
-                            //requireLockOn
-                            if (Marshal.ReadByte(ptr + 0x786) == 1) Marshal.WriteByte(ptr + 0x786, 0);
-                            //aimDownSight
-                            if (Marshal.ReadByte(ptr + 0x790) == 1) Marshal.WriteByte(ptr + 0x790, 0);
-                            //adsFire
-                            if (Marshal.ReadByte(ptr + 0x798) == 1) Marshal.WriteByte(ptr + 0x798, 0);
-                            //projImpactExplode
-                            if (Marshal.ReadByte(ptr + 0x7A6) == 1) Marshal.WriteByte(ptr + 0x7A6, 0);
-                        }
-                        else if (weaponPatches[i] == "sentry_minigun_mp")
-                        {
-                            //Damage
-                            if (Marshal.ReadInt32(ptr + 0x24C) == 20) Marshal.WriteInt32(ptr + 0x24C, 0);
-                            //Ranged Damage
-                            if (Marshal.ReadInt32(ptr + 0x6B0) == 20) Marshal.WriteInt32(ptr + 0x6B0, 0);
-                        }
-                        else if (weaponPatches[i] == "iw5_skorpion_mp")
-                        {
-                            foreach (IntPtr raygunPtr in raygunFireRatePtrs)
-                            {
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x00F8AC80));
+                weaponLoc += 0x27;
+                weaponName = Mem.ReadString(weaponLoc, 20);
+                if (weaponName == "uav_strike_marker_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Stock value
+                    Marshal.WriteInt32(weaponLoc + 0x239, 2);
+                    //noAdsWhenMagEmpty
+                    Marshal.WriteByte(weaponLoc + 0x782, 0);
+                    //adsFire
+                    Marshal.WriteByte(weaponLoc + 0x791, 0);
+                }
 
-                                //Fire rate
-                                if (Marshal.ReadInt32(raygunPtr + 0x5C) == 70)
-                                {
-                                    Marshal.WriteInt32(raygunPtr + 0x5C, 300);
-                                }
-                            }
-                        }
-                        else if (weaponPatches[i] == killstreaks.botWeapon_subBot)
-                        {
-                            //Damage
-                            if (Marshal.ReadInt32(ptr + 0x25A) == 10) Marshal.WriteInt32(ptr + 0x25A, 0);
-                        }
-                        else if (weaponPatches[i] == killstreaks.botWeapon_LMGBot)
-                        {
-                            //Damage
-                            if (Marshal.ReadInt32(ptr + 0x248) == 30) Marshal.WriteInt32(ptr + 0x248, 0);
-                            if (Marshal.ReadInt32(ptr + 0x24C) == 35) Marshal.WriteInt32(ptr + 0x24C, 0);
-                        }
-                    }
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x00F8C540));
+                weaponLoc += 0x2A;
+                weaponName = Mem.ReadString(weaponLoc, 6);
+                if (weaponName == "at4_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Stock value
+                    Marshal.WriteInt32(weaponLoc + 0x22E, 8);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x012B1774));
+                weaponName = Mem.ReadString(weaponLoc, 11);
+                if (weaponName == "iw5_xm25_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Stock value
+                    Marshal.WriteInt32(weaponLoc + 0x230, 8);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x00F8C060));
+                weaponLoc += 0x01;
+                weaponName = Mem.ReadString(weaponLoc, 5);
+                if (weaponName == "gl_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Stock value
+                    Marshal.WriteInt32(weaponLoc + 0x22B, 8);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x01296B58));
+                weaponName = Mem.ReadString(weaponLoc, 21);
+                if (weaponName == "uav_strike_missile_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //aimDownSight
+                    Marshal.WriteByte(weaponLoc + 0x78C, 0);
+                    //adsFire
+                    Marshal.WriteByte(weaponLoc + 0x794, 0);
+                    //projImpactExplode
+                    Marshal.WriteByte(weaponLoc + 0x7A2, 0);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x01298268));
+                weaponName = Mem.ReadString(weaponLoc, 24);
+                if (weaponName == "uav_strike_projectile_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //requireLockOn
+                    Marshal.WriteByte(weaponLoc + 0x786, 0);
+                    //aimDownSight
+                    Marshal.WriteByte(weaponLoc + 0x790, 0);
+                    //adsFire
+                    Marshal.WriteByte(weaponLoc + 0x798, 0);
+                    //projImpactExplode
+                    Marshal.WriteByte(weaponLoc + 0x7A6, 0);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x0127A0E8));
+                weaponName = Mem.ReadString(weaponLoc, 17);
+                if (weaponName == "sentry_minigun_mp")
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Damage
+                    Marshal.WriteInt32(weaponLoc + 0x24C, 0);
+                    //Ranged Damage
+                    Marshal.WriteInt32(weaponLoc + 0x6B0, 0);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x0127CEC0));
+                weaponName = Mem.ReadString(weaponLoc, killstreaks.botWeapon_subBot.Length);
+                if (weaponName == killstreaks.botWeapon_subBot)
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Damage
+                    Marshal.WriteInt32(weaponLoc + 0x25A, 0);
+                }
+
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x01277AB4));
+                weaponName = Mem.ReadString(weaponLoc, killstreaks.botWeapon_LMGBot.Length);
+                if (weaponName == killstreaks.botWeapon_LMGBot)
+                {
+                    //Utilities.PrintToConsole(weaponName);
+                    //Damage
+                    Marshal.WriteInt32(weaponLoc + 0x248, 0);
+                    Marshal.WriteInt32(weaponLoc + 0x24C, 0);
+                }
+                
+                weaponLoc = new IntPtr(Mem.getPtrAtLoc(baseAddress + 0x003B7524));
+                weaponLoc += 0x5C;
+                if (Marshal.ReadInt32(weaponLoc) == 70)
+                {
+                    //Utilities.PrintToConsole("iw5_skorpion_mp");
+                    //Fire rate
+                    Marshal.WriteInt32(weaponLoc, 300);
                 }
 
                 SetDvar("aiz_appliedGamePatches", 1);
@@ -4059,35 +3742,27 @@ namespace AIZombiesSupreme
                 task.RunWorkerAsync();
 
                 task.RunWorkerCompleted += new RunWorkerCompletedEventHandler(scanGameInfo_Completed);
-                task.RunWorkerCompleted += new RunWorkerCompletedEventHandler((s, e) => task.Dispose());
             }
         }
 #endregion
-
-        private static void setGametype(int ptr)
-        {
-            memoryScanning.Mem.WriteString(new IntPtr(ptr), modeText);
-        }
         private static void writeGameInfo()
         {
             //Log.Debug("Writing to " + string.Join(", ", gameInfo));
             foreach (int ptr in gameInfo)
             {
-                if (ptr == 0) continue;
+                if (ptr == 0) return;
 
                 try
                 {
                     string infoText = memoryScanning.Mem.ReadString(ptr, 350);
-                    if (!infoText.Contains("\\g_gametype\\")) continue;
+                    if (!infoText.Contains("\\g_gametype\\")) return;
                     infoText = infoText.Trim();
                     infoText = infoText.Replace("g_gametype\\war", "g_gametype\\^2AIZombies Supreme");
-                    //byte[] infoBytes = Encoding.ASCII.GetBytes(infoText);
                     memoryScanning.Mem.WriteString(new IntPtr(ptr), infoText);
                 }
                 catch
                 {
                     printToConsole(gameStrings[88]);
-                    break;
                 }
             }
         }
@@ -4097,15 +3772,14 @@ namespace AIZombiesSupreme
             //Log.Debug("Restoring to " + string.Join(", ", gameInfo));
             foreach (int ptr in gameInfo)
             {
-                if (ptr == 0) continue;
+                if (ptr == 0) return;
 
                 try
                 { 
                     string infoText = memoryScanning.Mem.ReadString(ptr, 350);
-                    if (!infoText.Contains("g_gametype\\")) continue;
+                    if (!infoText.Contains("g_gametype\\")) return;
                     infoText = infoText.Trim();
                     infoText = infoText.Replace("g_gametype\\^2AIZombies Supreme", "g_gametype\\war");
-                    //byte[] infoBytes = Encoding.ASCII.GetBytes(infoText);
                     memoryScanning.Mem.WriteString(new IntPtr(ptr), infoText);
                 }
                 catch
@@ -4680,11 +4354,11 @@ namespace AIZombiesSupreme
                     strings[317] = "Oružje";
                     strings[318] = "Pritisni ^3[{+activate}] ^7da opereš svoje grehe.";
                     strings[319] = "Pritisni ^3{2} ^7za {0} ^7[trošak: {1}]";
-                    strings[320] = "Pritisni ^3[{+activate}] ^7za {0}";
+                    strings[320] = "Pritisni ^3[{+activate}] ^7za ";
                     strings[321] = "Pritisni ^3{1} ^7za municiju [trošak: {0}]";
                     strings[322] = "Pritisni ^3[{+actionslot 3}] ^7za otpremanje P.E.S.";
                     strings[323] = "^5P.E.S. Aktiviran.";
-                    strings[324] = "^5Molim vas aktivirajte P.E.S.";
+                    strings[324] = "^5Molim vas aktivirajte P.E.S. ([{+actionslot 3}])";
                     strings[325] = "greška pri uèitavanju mapedit za mapu {0}: {1}";
                     strings[326] = "Nepoznata stavka MapEdit Entry {0}... ignorisanje";
                     strings[327] = "Nagraðeni ste sa svim pogodnostima!";
@@ -5025,11 +4699,11 @@ namespace AIZombiesSupreme
                     strings[317] = "Arma";
                     strings[318] = "Presiona ^3[{+activate}] ^7para lavar tus pecados.";
                     strings[319] = "Presione ^3{2} ^7para {0} ^7[Costo: {1}]";
-                    strings[320] = "Presione ^3[{+activate}] ^7para {0}";
+                    strings[320] = "Presione ^3[{+activate}] ^7para ";
                     strings[321] = "Presione ^3{1} ^7para Munición [Costo: {0}]";
                     strings[322] = "Presione ^3[{+actionslot 3}] ^7para equipar a P.E.S.";
                     strings[323] = "^5P.E.S. Activo.";
-                    strings[324] = "^5Por favor, active P.E.S.";
+                    strings[324] = "^5Por favor, active P.E.S. ([{+actionslot 3}])";
                     strings[325] = "Error al cargar mapedit para el mapa {0}: {1}";
                     strings[326] = "Entrada de MapEdit Desconocida {0} ... ignorando";
                     strings[327] = "Todos los beneficios concedidos!";
@@ -5370,11 +5044,11 @@ namespace AIZombiesSupreme
                     strings[317] = "Arme";
                     strings[318] = "Appuyez sur ^3[{+activate}] ^7pour effacer vos péchés.";
                     strings[319] = "Appuyez sur ^3{2} ^7pour {0} ^7[Coût: {1}].";
-                    strings[320] = "Appuyez sur ^3[{+activate}] ^7pour {0}";
+                    strings[320] = "Appuyez sur ^3[{+activate}] ^7pour ";
                     strings[321] = "Appuyez sur ^3{1} ^7pour Ammo [Coût: {0}].";
                     strings[322] = "Appuyez sur ^3[{+actionslot 3}]] ^7pour équiper P.E.S.";
                     strings[323] = "^5P.E.S. Actif.";
-                    strings[324] = "^5Veuillez activer P.E.S.";
+                    strings[324] = "^5Veuillez activer P.E.S. ([{+actionslot 3}])";
                     strings[325] = "Erreur lors du chargement de mapedit pour la carte {0}: {1}";
                     strings[326] = "Entrée MapEdit inconnue {0} ... en ignorant";
                     strings[327] = "Tous les avantages récompensés!";
@@ -5715,11 +5389,11 @@ namespace AIZombiesSupreme
                     strings[317] = "Waffe";
                     strings[318] = "Drücken Sie ^3[{+activate}] ^7, um Ihre Sünden wegzuwaschen.";
                     strings[319] = "Drücken Sie ^3{2} ^7für {0} ^7[Kosten: {1}]";
-                    strings[320] = "Drücken Sie ^3[{+activate}] ^7für";
+                    strings[320] = "Drücken Sie ^3[{+activate}] ^7für ";
                     strings[321] = "Drücke ^3{1} ^7für Munition [Kosten: {0}]";
                     strings[322] = "Drücken Sie ^3[{+actionslot 3}] ^7, um P.E.S.";
                     strings[323] = "^5P.E.S. Aktiv.";
-                    strings[324] = "^5Bitte aktivieren Sie P.E.S.";
+                    strings[324] = "^5Bitte aktivieren Sie P.E.S. ([{+actionslot 3}])";
                     strings[325] = "Fehler beim Laden von Mapedit für Karte {0}: {1}";
                     strings[326] = "Unknown MapEdit Eintrag {0} ... wird ignoriert";
                     strings[327] = "Alle Vergünstigungen ausgezeichnet!";
@@ -6061,11 +5735,11 @@ namespace AIZombiesSupreme
                 strings[317] = "Оружие";
                 strings[318] = "Нажмите ^3[{+activate}] ^7, чтобы смыть ваши грехи.";
                 strings[319] = "Нажмите ^3{2} ^7для {0} ^7[Стоимость: {1}]";
-                strings[320] = "Нажмите ^3[{+activate}] ^7для {0}";
+                strings[320] = "Нажмите ^3[{+activate}] ^7для ";
                 strings[321] = "Нажмите ^3{1} ^7для боеприпасов [Стоимость: {0}]";
                 strings[322] = "Нажмите ^3[{+actionslot 3}] ^7, чтобы оборудовать P.E.S.";
                 strings[323] = "^5P.E.S. Активный.";
-                strings[324] = "^5Пожалуйста, активируйте P.E.S.";
+                strings[324] = "^5Пожалуйста, активируйте P.E.S. ([{+actionslot 3}])";
                 strings[325] = "Ошибка загрузки mapedit для карты {0}: {1}";
                 strings[326] = "Неизвестная запись MapEdit {0} ... игнорируется";
                 strings[327] = "Все льготы награждены!";
@@ -6408,11 +6082,11 @@ namespace AIZombiesSupreme
                     strings[317] = "Weapon";
                     strings[318] = "Press ^3[{+activate}] ^7to wash away your sins.";
                     strings[319] = "Press ^3{2} ^7for {0} ^7[Cost: {1}]";
-                    strings[320] = "Press ^3[{+activate}] ^7for {0}";
+                    strings[320] = "Press ^3[{+activate}] ^7for ";
                     strings[321] = "Press ^3{1} ^7for Ammo [Cost: {0}]";
                     strings[322] = "Press ^3[{+actionslot 3}] ^7to equip P.E.S.";
                     strings[323] = "^5P.E.S. Active.";
-                    strings[324] = "^5Please activate P.E.S.";
+                    strings[324] = "^5Please activate P.E.S. ([{+actionslot 3}])";
                     strings[325] = "Error loading mapedit for map {0}: {1}";
                     strings[326] = "Unknown MapEdit Entry {0}... ignoring";
                     strings[327] = "All Perks Awarded!";
