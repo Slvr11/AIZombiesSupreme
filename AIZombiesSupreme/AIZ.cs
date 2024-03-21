@@ -39,7 +39,7 @@ namespace AIZombiesSupreme
         public static int maxPlayerHealth_Jugg = 251;
         public static bool powerActivated = false;
         public static bool tempPowerActivated = false;
-        public static readonly string version = "1.42";
+        public static readonly string version = "1.43";
         public static readonly string dev = "Slvr99";
 
         private static readonly int[] expectedDevResults = new int[100];//Set to 100 and generate results at runtime
@@ -3444,7 +3444,7 @@ namespace AIZombiesSupreme
             memoryScanning.Mem.InitMemory();
 
             //Gametype setup
-            if (allowServerGametypeHack) AfterDelay(100, memoryScanning.writeToServerInfoString);
+            if (allowServerGametypeHack) AfterDelay(500, memoryScanning.writeToServerInfoString);
             if (allowGametypeHack) AfterDelay(1000, memoryScanning.writeGameInfoString);
 
             if (GetDvarInt("aiz_appliedGamePatches") == 0) memoryScanning.writeWeaponPatches();
@@ -3452,17 +3452,34 @@ namespace AIZombiesSupreme
 #region memory scanning
         public class memoryScanning
         {
+            [DllImport("kernel32.dll")]
+            private static extern int VirtualQuery(IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
+            [StructLayout(LayoutKind.Sequential)]
+            private struct MEMORY_BASIC_INFORMATION
+            {
+                public IntPtr BaseAddress;
+                public IntPtr AllocationBase;
+                public uint AllocationProtect;
+                public IntPtr RegionSize;
+                public uint State;
+                public uint Protect;
+                public uint Type;
+            }
+
             private static Dictionary<string, List<IntPtr>> weaponStructs = new Dictionary<string, List<IntPtr>>();
             private static string[] weaponPatches = new string[] { "uav_strike_marker_mp", "at4_mp", "stinger_mp", "iw5_xm25_mp", "gl_mp", "uav_strike_missile_mp", "uav_strike_projectile_mp", "sentry_minigun_mp", killstreaks.botWeapon_subBot, killstreaks.botWeapon_LMGBot, "iw5_skorpion_mp" };
             private static List<IntPtr> raygunFireRatePtrs = new List<IntPtr>();
             private static int baseAddress = 0x0;
             private static int serverInfoStringAddress = 0x0;
+            private static readonly int maxServerInfoStringTries = 10;
+            private static int currentServerInfoStringTries = 0;
 
             public static class Mem
             {
                 public static void InitMemory()
                 {
                     SetDvarIfUninitialized("sv_serverInfoStringAddress", 0);
+                    SetDvarIfUninitialized("sv_serverInfoStringAddressList", 0);
                     serverInfoStringAddress = GetDvarInt("sv_serverInfoStringAddress");
 
                     int baseAddressDvar = GetDvarInt("sv_baseAddress");
@@ -3478,6 +3495,14 @@ namespace AIZombiesSupreme
                         SetDvarIfUninitialized("sv_baseAddress", baseAddress);
                         thisProcess.Dispose();
                     }
+                }
+                public static bool CanReadMemory(IntPtr address, uint length)
+                {
+                    MEMORY_BASIC_INFORMATION mem;
+                    VirtualQuery(address, out mem, length);
+
+                    if (mem.Protect == 0x40 || mem.Protect == 0x04 || mem.Protect == 0x02) return true;
+                    return false;
                 }
                 public static string ReadString(int address, int maxlen = 0)
                     => ReadString(new IntPtr(address), maxlen);
@@ -3509,6 +3534,124 @@ namespace AIZombiesSupreme
                 public static int getPtrAtLoc(int loc)
                     => Marshal.ReadInt32(new IntPtr(loc));
             }
+            public static List<IntPtr> scanForServerInfo(int min, int max)
+            {
+                Process p = Process.GetCurrentProcess();
+                List<IntPtr> ptrs = new List<IntPtr>();
+                IntPtr currentAddr = new IntPtr(min);
+                int bufferSize = 1024;
+                byte[] buffer = new byte[bufferSize];
+                string s = null;
+                string test = @"gn\IW4\gt\aiz";
+                string key = @"gn\IW5\gt\";
+
+                for (; (int)currentAddr < max; currentAddr += 1024)
+                {
+                    if (!Mem.CanReadMemory(currentAddr, (uint)bufferSize)) continue;
+
+                    s = null;
+                    Marshal.Copy(currentAddr, buffer, 0, bufferSize);
+                    s = Encoding.ASCII.GetString(buffer);
+
+                    if (!string.IsNullOrEmpty(s))
+                    {
+                        if (s.Contains(key))
+                        {
+                            int offset = s.IndexOf("gn");
+
+                            //Find out if this is real or not
+                            Mem.WriteString(currentAddr + offset, test, false);
+                            System.Threading.Thread.Sleep(50);
+                            byte[] returnBuffer = new byte[test.Length];
+                            string returned = Mem.ReadString(currentAddr + offset, 13);
+
+                            if (test == returned)
+                            {
+                                ptrs.Add(currentAddr + offset);
+                                //Utilities.PrintToConsole("Adding ptr " + (currentAddr + offset).ToString("X"));
+                            }
+                        }
+                    }
+                }
+                return ptrs;
+            }
+            public static void scanServerInfo(object sender, DoWorkEventArgs e)
+            {
+                int[] arguments = e.Argument as int[];
+                e.Result = scanForServerInfo(arguments[0], arguments[1]);
+            }
+            public static void scanForServerInfoString(int min, int max)
+            {
+                string sv_serverinfo_addr = GetDvar("sv_serverInfoStringAddressList");
+                if (string.IsNullOrEmpty(sv_serverinfo_addr) || sv_serverinfo_addr == "0") //first start
+                {
+                    BackgroundWorker task = new BackgroundWorker();
+                    task.DoWork += scanServerInfo;
+                    task.RunWorkerAsync(new int[2] { min, max });
+
+                    task.RunWorkerCompleted += new RunWorkerCompletedEventHandler(scanServerInfo_Completed);
+                }
+                else
+                {
+                    //skip search, just load from sdvar
+                    string[] parts = sv_serverinfo_addr.Split(' ');
+                    int[] addrs = Array.ConvertAll(parts, int.Parse);
+                    if (addrs.Length > 0)
+                    {
+                        for (int i = 50; i <= addrs.Length * 50; i += 50)
+                        {
+                            int index = (i / 50) - 1;
+                            int addr = addrs[index];
+                            AfterDelay(i, () => memoryScanning.Mem.WriteString(new IntPtr(addr), modeText));
+                        }
+                    }
+                }
+            }
+            private static void scanServerInfo_Completed(object sender, RunWorkerCompletedEventArgs e)
+            {
+                ((BackgroundWorker)sender).Dispose();
+                if (e.Cancelled)
+                {
+                    Utilities.PrintToConsole(gameStrings[74]);
+                    return;
+                }
+                if (e.Error != null)
+                {
+                    Utilities.PrintToConsole(gameStrings[75] + e.Error.Message);
+                    return;
+                }
+
+                List<IntPtr> addrs = e.Result as List<IntPtr>;
+                if (addrs.Count == 0)
+                {
+                    Utilities.PrintToConsole(gameStrings[76]);
+                    return;
+                }
+
+                setServerInfoPtrs(addrs);
+
+               
+            }
+            private static void setServerInfoPtrs(List<IntPtr> addrs)
+            {
+                if (addrs.Count > 0)
+                {
+                    //save found address(es)
+                    string addrDvar = string.Join(" ", addrs);
+                    SetDvar("sv_serverInfoStringAddressList", addrDvar);
+                    for (int i = 50; i <= addrs.Count * 50; i += 50)
+                    {
+                        int index = (i / 50) - 1;
+                        IntPtr addr = addrs[index];
+                        AfterDelay(i, () => memoryScanning.Mem.WriteString(addr, modeText));
+                    }
+                }
+                else
+                {
+                    Utilities.PrintToConsole(gameStrings[84]);
+                    return;
+                }
+            }
             public static List<IntPtr> scanForGameInfo()
             {
                 List<IntPtr> ptrs = new List<IntPtr>();
@@ -3520,7 +3663,7 @@ namespace AIZombiesSupreme
 
                 for (; (int)currentAddr < 0x01D00000; currentAddr += bufferSize)
                 {
-                    //if (!Mem.canReadMemory(currentAddr, (uint)bufferSize)) continue;
+                    if (!Mem.CanReadMemory(currentAddr, (uint)bufferSize)) continue;
 
                     s = null;
                     Marshal.Copy(currentAddr, buffer, 0, bufferSize);
@@ -3551,25 +3694,54 @@ namespace AIZombiesSupreme
             }
             public static void writeToServerInfoString()
             {
+                IntPtr serverInfoPtr = new IntPtr(0x0013DD0C);
+                /*
+                if (!Mem.CanReadMemory(serverInfoPtr, 13))//If we can't access the ptr then just do a search
+                {
+                    memoryScanning.scanForServerInfoString(0x04000000, 0x0A000000);
+                    return;
+                }
+                */
+                string sv_serverinfo_addr = GetDvar("sv_serverInfoStringAddressList");
+                if (sv_serverinfo_addr != "0") //If we already searched just use the search
+                {
+                    memoryScanning.scanForServerInfoString(0, 0);
+                    return;
+                }
                 if (serverInfoStringAddress == 0)
                 {
-                    int infoStringAddress = Marshal.ReadInt32(new IntPtr(0x0013DD0C));
-                    if (infoStringAddress == 0x0 || infoStringAddress > 0x08000000 || infoStringAddress < 0x04000000)
+                    int infoStringAddress = Marshal.ReadInt32(serverInfoPtr);
+                    if (infoStringAddress == 0x0 || infoStringAddress > 0x0A000000 || infoStringAddress < 0x04000000)
                     {
+                        currentServerInfoStringTries++;
+                        //If this ptr isn't working out then just do a scan
+                        if (currentServerInfoStringTries >= maxServerInfoStringTries)
+                        {
+                            memoryScanning.scanForServerInfoString(0x04000000, 0x0A000000);
+                            return;
+                        }
                         AfterDelay(50, memoryScanning.writeToServerInfoString);
                         return;
                     }
                     infoStringAddress--;
                     serverInfoStringAddress = infoStringAddress;
                     SetDvar("sv_serverInfoStringAddress", serverInfoStringAddress);
+                    writeServerInfoStringToPtr(serverInfoStringAddress);
                 }
+                else
+                    writeServerInfoStringToPtr(serverInfoStringAddress);
+            }
+            private static void writeServerInfoStringToPtr(int? ptr = null)
+            {
+                int targetLoc = serverInfoStringAddress;
+                if (ptr.HasValue)
+                    targetLoc = ptr.Value;
 
-                //Utilities.PrintToConsole("Server gametype string addr: " + (serverInfoStringAddress).ToString("X"));
-                string output = Mem.ReadString(serverInfoStringAddress, 9);
+                string output = Mem.ReadString(serverInfoStringAddress, 13);
                 //Utilities.PrintToConsole("Server Output: " + output);
 
-                if (output.StartsWith(@"gn\IW5\gt"))
-                    memoryScanning.Mem.WriteString(new IntPtr(serverInfoStringAddress), modeText);
+                if (output.StartsWith(@"gn\IW5\gt\war"))
+                    memoryScanning.Mem.WriteString(new IntPtr(targetLoc), modeText);
             }
             
             private static void scanGameInfo_Completed(object sender, RunWorkerCompletedEventArgs e)
