@@ -1480,6 +1480,7 @@ namespace AIZombiesSupreme
                     {
                         AIZ.updatePlayerWeaponsList(player, player.CurrentWeapon, true);
                         player.TakeWeapon(player.CurrentWeapon);
+                        hud.updateAmmoHud(player, true, name);
                     }
                     else hud.updateAmmoHud(player, false);
                 }
@@ -1491,6 +1492,7 @@ namespace AIZombiesSupreme
                     player.SwitchToWeapon(name);
                     AIZ.updatePlayerWeaponsList(player, name);
                     player.SetField("newGunReady", false);
+                    hud.updateAmmoHud(player, true, name);
                 }
                 else hud.updateAmmoHud(player, false);
                 player.PlayLocalSound("ammo_crate_use");

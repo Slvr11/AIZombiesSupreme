@@ -291,9 +291,9 @@ namespace AIZombiesSupreme
                     {
                         Vector3 dir = VectorToAngles(botOrigin - closeOrigin);
                         Vector3 forward = AnglesToForward(new Vector3(0, dir.Y, 0));
-                        Vector3 awayPos = botOrigin - (forward * 50);
+                        Vector3 awayPos = botOrigin + (forward * 50);
                         ai.MoveTo(awayPos, botOrigin.DistanceTo(awayPos) / 120);
-                        ai.RotateTo(new Vector3(0, -dir.Y, 0), .3f, .1f, .1f);
+                        ai.RotateTo(new Vector3(0, dir.Y, 0), .3f, .1f, .1f);
                         hasCollidedWithOtherBot = true;
                         break;
                     }

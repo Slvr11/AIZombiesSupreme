@@ -670,10 +670,18 @@ namespace AIZombiesSupreme
         private static IEnumerator updateWeaponName(Entity player, string weapon)
         {
             if (!player.HasField("aizHud_created")) yield break;
+
+            player.SetField("weaponHudUpdateCount", player.GetField<int>("weaponHudUpdateCount") + 1);
+
             HudElem weaponName = player.GetField<HudElem>("hud_weaponName");
             weaponName.Alpha = 1;
             _setText(weaponName, getWeaponName(weapon));
-            yield return Wait(1);
+            yield return Wait(1.5f);
+
+            player.SetField("weaponHudUpdateCount", player.GetField<int>("weaponHudUpdateCount") - 1);
+            if (player.GetField<int>("weaponHudUpdateCount") != 0)
+                yield break;
+
             weaponName.FadeOverTime(1);
             weaponName.Alpha = 0;
             //yield return Wait(1);
@@ -896,7 +904,7 @@ namespace AIZombiesSupreme
                     return "^2Hand-gun";
                 case "iw5_pp90m1_mp_silencer_xmags_camo10":
                     return "^2Flamethrower";
-                case "iw5_pecheneg_mp_thermal_rof":
+                case "iw5_pecheneg_mp_rof_thermal":
                     return "^8Death Machine";
                 case "airdrop_trap_marker_mp":
                     return "Emergency Airdrop Marker";

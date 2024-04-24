@@ -123,8 +123,8 @@ namespace AIZombiesSupreme
         }
         private static IEnumerator giveDeathMachine(Entity player)
         {
-            player.GiveWeapon("iw5_pecheneg_mp_thermal_rof");
-            StartAsync(AIZ.switchToWeapon_delay(player, "iw5_pecheneg_mp_thermal_rof", .2f));
+            player.GiveWeapon("iw5_pecheneg_mp_rof_thermal");
+            StartAsync(AIZ.switchToWeapon_delay(player, "iw5_pecheneg_mp_rof_thermal", .2f));
             player.DisableWeaponSwitch();
             player.AllowAds(false);
             player.SetPerk("specialty_rof", true, false);
@@ -133,7 +133,7 @@ namespace AIZombiesSupreme
             //player.SetPerk("specialty_bulletaccuracy", true, false);
             //player.SetClientDvar("ui_drawCrosshair", "0");
             player.SetSpreadOverride(1);
-            hud.updateAmmoHud(player, true, "iw5_pecheneg_mp_thermal_rof");
+            hud.updateAmmoHud(player, true, "iw5_pecheneg_mp_rof_thermal");
             yield return Wait(30);
 
             if (AIZ.isPlayer(player) && player.IsAlive)
@@ -141,11 +141,12 @@ namespace AIZombiesSupreme
                 if (!player.GetField<bool>("perk5bought")) player.UnSetPerk("specialty_rof", true);
                 //player.UnSetPerk("specialty_bulletaccuracy", true);
                 //player.SetClientDvar("ui_drawCrosshair", "1");
-                player.TakeWeapon("iw5_pecheneg_mp_thermal_rof");
+                player.TakeWeapon("iw5_pecheneg_mp_rof_thermal");
                 player.SwitchToWeapon(player.GetField<string>("lastDroppableWeapon"));
                 player.EnableWeaponSwitch();
                 player.AllowAds(true);
                 player.ResetSpreadOverride();
+                hud.updateAmmoHud(player, true, player.GetField<string>("lastDroppableWeapon"));
             }
         }
 

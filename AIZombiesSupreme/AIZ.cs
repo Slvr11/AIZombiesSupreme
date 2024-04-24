@@ -39,7 +39,7 @@ namespace AIZombiesSupreme
         public static int maxPlayerHealth_Jugg = 251;
         public static bool powerActivated = false;
         public static bool tempPowerActivated = false;
-        public static readonly string version = "1.43";
+        public static readonly string version = "1.44";
         public static readonly string dev = "Slvr99";
 
         private static readonly int[] expectedDevResults = new int[100];//Set to 100 and generate results at runtime
@@ -562,7 +562,7 @@ namespace AIZombiesSupreme
             player.SetClientDvar("perk_diveViewRollSpeed", 0.00000001f);
             player.SetClientDvar("perk_diveGravityScale", .4f);
             player.SetClientDvar("perk_extendedMagsMGAmmo", 899);
-            player.SetClientDvar("cg_weaponCycleDelay", 750);//Add weapon swap delay to fix hud issues
+            player.SetClientDvar("cg_weaponCycleDelay", 0);
             //player.SetClientDvar("gameMode", "so");
             player.SetClientDvar("useRelativeTeamColors", 1);
             player.SetClientDvars("bg_legYawTolerance", 50, "player_turnAnims", 1);
@@ -612,6 +612,9 @@ namespace AIZombiesSupreme
             player.NotifyOnPlayerCommand("use_button_pressed:" + player.EntRef, "+activate");
             player.NotifyOnPlayerCommand("bankWithdraw:" + player.EntRef, "vote yes");
             player.NotifyOnPlayerCommand("uav_reroute:" + player.EntRef, "vote no");//Drone reroute
+            player.NotifyOnPlayerCommand("weapon_switch_pressed", "weapnext");
+            player.OnNotify("weapon_switch_pressed", onWeaponSwitchPressed);
+            player.SetField("weaponHudUpdateCount", 0);
 
             player.CloseInGameMenu();
             //player.ClosePopUpMenu();
@@ -1752,6 +1755,25 @@ namespace AIZombiesSupreme
             else if (weaponIsUpgrade(weapon) && !isWeaponDeathMachine(weapon))
                 player.PlaySound("whizby_far_05_L");//Alt whizby_far_00_L
         }
+        private static void onWeaponSwitchPressed(Entity player)
+        {
+            if (player.HasField("waitingForWeaponSwitch")) return;
+
+            StartAsync(watchWeaponChange(player));
+        }
+        private static IEnumerator watchWeaponChange(Entity player)
+        {
+            if (!player.IsAlive) yield break;
+
+            player.SetField("waitingForWeaponSwitch", true);
+
+            while (player.IsSwitchingWeapon())
+                yield return WaitForFrame();
+
+            hud.updateAmmoHud(player, true);
+
+            player.ClearField("waitingForWeaponSwitch");
+        }
 
         private static IEnumerator watchForMarkerStick(Entity marker, int type)
         {
@@ -2211,7 +2233,7 @@ namespace AIZombiesSupreme
                 {
                     newCfg.WriteLine("//AIZombies Supreme v{0} Config File//", version);
                     //newCfg.WriteLine("Waves: {0} //The max amount of waves to play in a game.", roundSystem.totalWaves);
-                    newCfg.WriteLine("Game Language: {0} //The language that AIZombies will be in. Valid laguages are 'english', 'spanish', 'french', 'german', 'croation', and 'serbian'.", gameLanguage);
+                    newCfg.WriteLine("Game Language: {0} //The language that AIZombies will be in. Valid languages are 'english', 'spanish', 'french', 'german', 'croation', and 'serbian'.", gameLanguage);
                     newCfg.WriteLine("Spawn Weapon System: {0} //The type of weapon spawn. Valid options are 'Normal' and 'Random'.", spawnType == 1 ? "Random" : "Normal");
                     newCfg.WriteLine("Max Health: {0} //The normal max player health.", maxPlayerHealth);
                     newCfg.WriteLine("Max Juggernog Health: {0} //The max player health with juggernog.", maxPlayerHealth_Jugg);
@@ -4178,24 +4200,25 @@ namespace AIZombiesSupreme
         {
             string[] strings = new string[341];
 
-            using (StreamReader cfg = new StreamReader("scripts\\aizombies\\config.cfg"))//Read directly from language cfg since this runs before loadConfig()
+            if (File.Exists("scripts\\aizombies\\config.cfg"))
             {
-                while (!cfg.EndOfStream)
+                using (StreamReader cfg = new StreamReader("scripts\\aizombies\\config.cfg"))//Read directly from language cfg since this runs before loadConfig()
                 {
-                    string line = cfg.ReadLine();
-                    if (line.StartsWith("Game Language:"))
+                    while (!cfg.EndOfStream)
                     {
-                        line = clipSpaces(line);
-                        line = line.Split('/')[0];
-                        line = line.ToLowerInvariant();
-                        string setting = line.Split(':')[0];
-                        string value = line.Split(':')[1];
-                        setGameSetting(setting, value);
-                        break;
+                        string line = cfg.ReadLine();
+                        if (line.StartsWith("Game Language:"))
+                        {
+                            line = clipSpaces(line);
+                            line = line.Split('/')[0];
+                            line = line.ToLowerInvariant();
+                            string setting = line.Split(':')[0];
+                            string value = line.Split(':')[1];
+                            setGameSetting(setting, value);
+                            break;
+                        }
                     }
                 }
-                cfg.Close();
-                cfg.Dispose();
             }
 
             //Utilities.PrintToConsole("Using language " + gameLanguage);

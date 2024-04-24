@@ -306,7 +306,7 @@ namespace AIZombiesSupreme
                 meansOfDeath = "MOD_PASSTHRU";
                 damage = 300;
             }
-            else if (((string)weapon == "remote_tank_projectile_mp" || (string)weapon == "uav_strike_projectile_mp" || (string)weapon == "javelin_mp") && attacker.As<Entity>().HasField("owner"))
+            else if (((string)weapon == "remote_tank_projectile_mp" || AIZ.isThunderGun((string)weapon)) && attacker.As<Entity>().HasField("owner"))
             {
                 player = attacker.As<Entity>().GetField<Entity>("owner");
                 meansOfDeath = "MOD_PASSTHRU";
