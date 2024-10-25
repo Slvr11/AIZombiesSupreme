@@ -48,7 +48,11 @@ namespace AIZombiesSupreme
             else//isNormalWave
             {
                 botUtil.botsForWave = 10 * Wave;
-                if (Wave != 1) botUtil.health += botUtil.healthScalar;
+                int hellMapScalar = 1;
+                if (AIZ.isHellMap)//Multiplicated scalar for hell maps
+                    hellMapScalar = 5;
+
+                if (Wave != 1) botUtil.health += botUtil.healthScalar * hellMapScalar;
             }
 
             if (!isBossWave) hud.stringsCleared = false;

@@ -41,6 +41,7 @@ namespace AIZombiesSupreme
                 //botHead.HidePart("j_helmet");
                 //botHead.HidePart("j_collar_rear");
                 bot.GetField<Entity>("headHitbox").SetCanDamage(true);
+                bot.GetField<Entity>("headHitbox").SetModel("ims_scorpion_explosive1");
             }
             bot.SetField("isAlive", true);
             bot.SetField("isAttacking", false);
@@ -194,7 +195,7 @@ namespace AIZombiesSupreme
                     if (!p.HasField("isDown")) continue;//Skip this player if they're not initiated for aiz
 
                     if (p.SessionTeam != "allies" || !p.IsAlive || p.GetField<bool>("isDown")) continue;
-                    if (p.GetField<bool>("isInHeliSniper")) continue;
+                    if (p.GetField<bool>("notTargetable")) continue;
 
                     Vector3 playerOrigin = p.Origin;
 
@@ -202,11 +203,8 @@ namespace AIZombiesSupreme
                     if (AIZ._mapname == "mp_radar" && killstreaks.mapStreakOut) targetDistance = 200;
                     if (botOrigin.DistanceTo(playerOrigin) > targetDistance) continue;
 
-                    Vector3 playerHeadTag = p.GetTagOrigin("j_head");
-                    bool trace;
-                    if (!isCrawler && !isBoss)
-                        trace = SightTracePassed(botHeadTag, playerHeadTag, false, ai, ai.GetField<Entity>("head"));
-                    else trace = SightTracePassed(botHeadTag, playerHeadTag, false, ai);
+                    Vector3 playerHeadTag = p.GetTagOrigin("j_head") + new Vector3(0, 0, 10);
+                    bool trace = SightTracePassed(botHeadTag + new Vector3(0, 0, 10), playerHeadTag, false, botHitbox);
                     if (trace)
                     {
                         //Log.Write(LogLevel.All, "Traced {0}", p.Name);
@@ -439,6 +437,8 @@ namespace AIZombiesSupreme
         {
             ai.SetField("isAttacking", true);
 
+            ai.MoveTo(ai.Origin, 0.05f);//Stop movement
+
             updateBotLastActiveTime(ai);
 
             if (ai.GetField<bool>("primedForNuke"))
@@ -449,27 +449,36 @@ namespace AIZombiesSupreme
             else if (isCrawler || ai.HasField("hasBeenCrippled")) playAnimOnBot(ai, crawlerAnim_attack);
             else playAnimOnBot(ai, anim_attack);
 
-            yield return Wait(.1f);
-            PlayFX(AIZ.fx_blood, target.Origin + new Vector3(0, 0, 30));
+            yield return Wait(.2f);
 
-            Vector3 dir = VectorToAngles(ai.Origin - target.Origin);
-            dir.Normalize();
-            float hitDir = dir.Y - target.GetPlayerAngles().Y;
+            if (!ai.GetField<bool>("isAlive"))//Do not damage if the bot has died during the swing
+                yield break;
 
-            if ((target.HasWeapon("riotshield_mp") || target.HasWeapon("iw5_riotshield_mp")) && ((target.CurrentWeapon != "riotshield_mp" && target.CurrentWeapon != "iw5_riotshield_mp" && hitDir > -80 && hitDir < 80) || (target.CurrentWeapon == "riotshield_mp" || target.CurrentWeapon == "iw5_riotshield_mp")))
-            {
-                target.PlaySound("melee_hit");
-                target.FinishPlayerDamage(null, null, dmg / 2, 0, "MOD_FALLING", "none", target.Origin, dir, "none", 0);
-            }
-            else
-            {
-                target.PlaySound("melee_punch_other");
-                target.FinishPlayerDamage(null, null, dmg, 0, "MOD_FALLING", "none", target.Origin, dir, "none", 0);
-            }
             int time = GetTime();
-            target.SetField("lastDamageTime", time);
+            if (target.Origin.DistanceTo(ai.Origin) <= 50 && time > target.GetField<int>("lastDamageTime") + AIZ.damageGracePeriod)//Only connect the attack if the player is close to the bot at this point and after a grace period.
+            {
+                target.SetField("lastDamageTime", time);
 
-            yield return Wait(.6f);
+                PlayFX(AIZ.fx_blood, target.Origin + new Vector3(0, 0, 30));
+
+                Vector3 dir = VectorToAngles(ai.Origin - target.Origin);
+                dir.Normalize();
+                float hitDir = dir.Y - target.GetPlayerAngles().Y;
+
+                if ((target.HasWeapon("riotshield_mp") || target.HasWeapon("iw5_riotshield_mp")) && ((target.CurrentWeapon != "riotshield_mp" && target.CurrentWeapon != "iw5_riotshield_mp" && hitDir > -80 && hitDir < 80) || (target.CurrentWeapon == "riotshield_mp" || target.CurrentWeapon == "iw5_riotshield_mp")))
+                {
+                    target.PlaySound("melee_hit");
+                    target.FinishPlayerDamage(null, null, dmg / 2, 0, "MOD_FALLING", "none", target.Origin, dir, "none", 0);
+                }
+                else
+                {
+                    target.PlaySound("melee_punch_other");
+                    target.FinishPlayerDamage(null, null, dmg, 0, "MOD_FALLING", "none", target.Origin, dir, "none", 0);
+                }
+            }
+
+            yield return Wait(.5f);
+
             if ((isCrawler || ai.HasField("hasBeenCrippled")) && ai.GetField<bool>("isAlive"))
                 playAnimOnBot(ai, crawlerAnim_walk);
             else if (isBoss && ai.GetField<bool>("isAlive"))
@@ -487,7 +496,7 @@ namespace AIZombiesSupreme
             if (ai.GetField<bool>("primedForNuke")) yield break;
 
             yield return Wait(7);
-            if (target.GetField<int>("lastDamageTime") == time && target.SessionState == "playing")
+            if (IsDefined(target) && target.GetField<int>("lastDamageTime") == time && target.SessionState == "playing")
                 target.Health = target.MaxHealth;
         }
     }

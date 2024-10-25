@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using InfinityScript;
 using static InfinityScript.GSCFunctions;
+using System.Collections.Generic;
 
 namespace AIZombiesSupreme
 {
@@ -11,7 +12,7 @@ namespace AIZombiesSupreme
         private static byte nukeTime = 10;
         public static int mapStreakKills = -1;
         public static string mapStreakWeapon = "killstreak_double_uav_mp";
-        public static string mapStreakIcon = "specialty_placeholder";
+        public static string mapStreakIcon = "white";
         public static string mapStreakName = AIZ.gameStrings[215];
         private static bool littlebirdOut = false;
         public static bool mapStreakOut = false;
@@ -92,7 +93,7 @@ namespace AIZombiesSupreme
             else if (streak == 250)
             {
                 player.PlayLocalSound("US_1mc_achieve_turret");
-                player.ShowHudSplash("sentry_gl", 0, streak);
+                player.ShowHudSplash("gl_turret", 0, streak);
                 player.GiveWeapon("killstreak_remote_turret_mp", 0, false);
                 player.SetActionSlot(5, "weapon", "killstreak_remote_turret_mp");
                 player.SetField("ownsSentryGL", true);
@@ -146,7 +147,7 @@ namespace AIZombiesSupreme
                 spawnBotForPlayer(player);
             }
             */
-            else if (streak == 350 && AIZ._mapname != "mp_carbon" && AIZ._mapname != "mp_cement" && !player.GetField<bool>("ownsSubBot"))//Disabled on carbon and cement for crappy optimization
+            else if (streak == 350 && !player.GetField<bool>("ownsSubBot"))
             {
                 player.IPrintLnBold(string.Format(AIZ.gameStrings[218], AIZ.gameStrings[226]));
                 player.PlayLocalSound("mp_killstreak_juggernaut");
@@ -154,7 +155,7 @@ namespace AIZombiesSupreme
                 player.SetActionSlot(6, "weapon", "killstreak_triple_uav_mp");
                 player.SetField("ownsSubBot", true);
             }
-            else if (streak == 600 && AIZ._mapname != "mp_carbon" && AIZ._mapname != "mp_cement" && !player.GetField<bool>("ownsLMGBot"))//Disabled on carbon and cement for crappy optimization
+            else if (streak == 600 && !player.GetField<bool>("ownsLMGBot"))
             {
                 player.IPrintLnBold(string.Format(AIZ.gameStrings[218], AIZ.gameStrings[227]));
                 player.PlayLocalSound("mp_killstreak_juggernaut");
@@ -235,6 +236,38 @@ namespace AIZombiesSupreme
             player.Kills = streak;
             checkKillstreak(player);
             player.Kills = oldStreak;
+        }
+        public static string getKillstreakCrateIcon(int streak)
+        {
+            switch (streak)
+            {
+                case 0:
+                    return "waypoint_ammo_friendly";
+                case 1:
+                    return "specialty_predator_missile_crate";
+                case 2:
+                    return "specialty_sentry_gun_crate";
+                case 3:
+                    return "specialty_emp_crate";
+                case 4:
+                    return "specialty_deployable_vest_crate";
+                case 5:
+                    return "dpad_killstreak_nuke";
+                case 6:
+                    return "specialty_ac130_crate";
+                case 7:
+                    return "headicon_heli_extract_point";
+                case 8:
+                    return "specialty_precision_airstrike_crate";
+                case 9:
+                    return "specialty_sam_turret_crate";
+                case 10:
+                    return "specialty_carepackage";
+                case 11:
+                    return "specialty_airdrop_emergency";
+            }
+
+            return "white";
         }
 
         public static void executeKillstreak(Entity player, string newWeap)
@@ -505,15 +538,16 @@ namespace AIZombiesSupreme
             mapEdit._realObjIDList[objID] = true;
             turret.SetField("realObjID", objID);
 
-            turret.SetField("isBeingCarried", true);
+            turret.SetField("isBeingCarried", false);
             turret.SetField("canBePlaced", true);
             turret.SetField("timeLeft", 90);
             if (isGL) turret.SetField("timeLeft", 120);
             turret.SetField("target", turret);
-            Entity trigger = Spawn("trigger_radius", turret.Origin + new Vector3(0, 0, -10), 0, 105, 64);
+            Entity trigger = Spawn("script_origin", turret.Origin);
             turret.SetField("trigger", trigger);
-            trigger.EnableLinkTo();
-            trigger.LinkTo(turret);
+            trigger.LinkTo(turret, "tag_origin");
+            trigger.SetField("turret", turret);
+            mapEdit.makeUsable(trigger, "sentryPickup", 96);
 
             OnInterval(1000, () => sentry_timer(turret));
             OnInterval(50, () => sentry_targeting(turret));
@@ -522,6 +556,8 @@ namespace AIZombiesSupreme
 
         public static void pickupSentry(Entity player, Entity sentry, bool canCancel)
         {
+            if (sentry.GetField<bool>("isBeingCarried") || player.GetField<bool>("isCarryingSentry") || player != sentry.GetField<Entity>("owner")) return;
+
             sentry.ClearTargetEntity();
             sentry.SetMode("sentry_offline");
             sentry.SetField("isBeingCarried", true);
@@ -703,7 +739,7 @@ namespace AIZombiesSupreme
 
             Entity trigger = sentry.GetField<Entity>("trigger");
             //if (Utilities.isEntDefined(trigger))
-            trigger.Delete();
+            mapEdit.removeUsable(trigger);
 
             //Entity fx = sentry.GetField<Entity>("flashFx");
             //if (Utilities.isEntDefined(fx))
@@ -1310,6 +1346,11 @@ namespace AIZombiesSupreme
             gun.SetModel("defaultweapon");
             bot.SetField("gun", gun);
 
+            Entity minimapIcon = SpawnPlane(owner, "script_model", bot.Origin, "compassping_friendly_party_mp", "compassping_friendly_party_mp");
+            minimapIcon.Angles = bot.Angles;
+            minimapIcon.LinkTo(bot);
+            bot.SetField("icon", minimapIcon);
+
             Entity bothead = Spawn("script_model", bot.Origin);
             bothead.SetModel(AIZ.headModel);
             bothead.LinkTo(bot, "j_spine4", Vector3.Zero, Vector3.Zero);
@@ -1656,6 +1697,10 @@ namespace AIZombiesSupreme
             botGun.Delete();
             bot.ClearField("gun");
 
+            Entity minimapIcon = bot.GetField<Entity>("icon");
+            minimapIcon.Delete();
+            bot.ClearField("icon");
+
             bot.StartRagdoll();
             PhysicsExplosionSphere(bot.Origin, 75, 75, AIZ.rng.Next(1, 3));
 
@@ -1740,7 +1785,7 @@ namespace AIZombiesSupreme
             enterPos.SetField("usabletype", "heliExtraction");
             lb.SetField("enterNode", enterPos);
             HudElem headIcon = NewClientHudElem(owner);
-            //headIcon.Archived = true;
+            headIcon.Archived = false;
             headIcon.X = enterPos.Origin.X;
             headIcon.Y = enterPos.Origin.Y;
             headIcon.Z = enterPos.Origin.Z + 40;
@@ -1771,7 +1816,8 @@ namespace AIZombiesSupreme
         public static IEnumerator heliSniper_doBoarding(Entity heli, Entity player)
         {
             //player.Hide();
-            player.SetField("isInHeliSniper", true);
+            player.SetField("notTargetable", true);
+            player.SetField("heliSniperLastInsertionPos", player.Origin);
             heli.SetField("flying", true);
             player.DisableWeapons();
             player.FreezeControls(true);
@@ -1847,7 +1893,7 @@ namespace AIZombiesSupreme
             if (!player.IsAlive) return false;
 
             if (player.GetStance() != "crouch") player.SetStance("crouch");
-            if (player.GetField<bool>("isInHeliSniper")) return true;
+            if (player.GetField<bool>("notTargetable")) return true;
             else return false;
         }
         private static IEnumerator heliSniper_flyUp(Entity lb, Entity player)
@@ -1909,12 +1955,16 @@ namespace AIZombiesSupreme
             {
                 lb.SetSpeed(150, 50, 50);
                 lb.SetVehGoalPos(lb.Origin - new Vector3(0, 0, 800), true);
-                lb.SetTargetYaw(lb.Angles.Y);
+                lb.ClearGoalYaw();
+                Vector3 toInsertionPos = VectorToAngles(owner.GetField<Vector3>("heliSniperLastInsertionPos") - lb.Origin);
+                lb.SetTargetYaw(toInsertionPos.Y - 90);
+                
                 yield return Wait(3.05f);
 
                 owner.EnableWeaponSwitch();
                 owner.SwitchToWeapon(owner.GetField<string>("lastDroppableWeapon"));
                 owner.DisableWeaponSwitch();
+
                 yield return Wait(.75f);
 
                 owner.TakeWeapon("iw5_mk12spr_mp_acog_xmags");
@@ -1929,10 +1979,12 @@ namespace AIZombiesSupreme
                 lb.ClearGoalYaw();
                 lb.ClearTargetYaw();
                 lb.SetVehGoalPos(lb.Origin + new Vector3(0, 0, 1800), true);
+
                 yield return Wait(5.05f);
 
                 lb.SetSpeed(350, 225, 75);
                 lb.SetVehGoalPos(lb.Origin + new Vector3(-100000, 0, 0), false);
+
                 yield return Wait(5);
 
                 lb.FreeHelicopter();
@@ -1976,11 +2028,15 @@ namespace AIZombiesSupreme
             bool isGrounded = player.IsOnGround();
             if (!isGrounded && AIZ.isPlayer(player))
             {
-                //Temporary fix, push player forward on X axis until they're unstuck
-                player.SetOrigin(player.Origin + new Vector3(1, 0, -1));
+                //Push the player towards their last insertion position, likely in a legal space instead of outside of the maps
+                var toInsertionPos = player.GetField<Vector3>("heliSniperLastInsertionPos") - player.Origin;
+                toInsertionPos = VectorNormalize(toInsertionPos);
+                var targetOffset = new Vector3(toInsertionPos.X, toInsertionPos.Y, -1);
+                player.SetOrigin(player.Origin + targetOffset);
+
                 return true;
             }
-            player.SetField("isInHeliSniper", false);
+            player.SetField("notTargetable", false);
             return false;
         }
 
@@ -2027,26 +2083,14 @@ namespace AIZombiesSupreme
 
             crate.Unlink();
             crate.CloneBrushModelToScriptModel(mapEdit._airdropCollision);
-            Vector3 dropImpulse = new Vector3(AIZ.rng.Next(5), AIZ.rng.Next(5), AIZ.rng.Next(5));
-            crate.PhysicsLaunchServer(Vector3.Zero, dropImpulse);
+            crate.SetContents(1);
+            StartAsync(dropTheCrate(crate, owner, true));
+
             yield return Wait(1);
 
             lb.SetVehGoalPos(dropLocation + new Vector3(50000, 0, 1800), true);
-            yield return Wait(4);
 
-            int curObjID = 31 - mapEdit.getNextObjID();
-            Objective_Add(curObjID, "active", crate.Origin, "compass_objpoint_ammo_friendly");
-            //Objective_OnEntity(curObjID, crate);
-            crate.SetField("objID", curObjID);
-            mapEdit.addObjID(crate, curObjID);
-            crate.SetField("range", 75);
-            crate.SetField("usabletype", "carePackage");
-            crate.SetField("user", crate);
-            crate.SetField("streak", AIZ.rng.Next(10));
-            crate.SetField("owner", owner);
-            mapEdit.makeUsable(crate, "carePackage", 75);
-            StartAsync(watchCrateUsage(crate));
-            yield return Wait(3);
+            yield return Wait(7);
 
             lb.FreeHelicopter();
 
@@ -2117,7 +2161,7 @@ namespace AIZombiesSupreme
             }
             yield return Wait(7.5f);
             foreach (Entity crate in crates)
-                StartAsync(dropTheCrate(crate, owner));
+                StartAsync(dropTheCrate(crate, owner, false));
             c130.MoveTo(dropLocation + (forward * 15000), 7.5f);
 
             yield return Wait(7.5f);
@@ -2126,27 +2170,34 @@ namespace AIZombiesSupreme
             c130.ClearField("realObjID");
             c130.Delete();
         }
-        private static IEnumerator dropTheCrate(Entity crate, Entity owner)
+        private static IEnumerator dropTheCrate(Entity crate, Entity owner, bool isNormalAirdrop)
         {
-            crate.Angles = new Vector3(0, AIZ.rng.Next(360), 0);
+            if (!isNormalAirdrop)
+                crate.Angles = new Vector3(0, AIZ.rng.Next(360), 0);
+
             crate.CloneBrushModelToScriptModel(mapEdit._airdropCollision);
-            
-            int crateIndex = crate.GetField<int>("crateIndex");
-            switch (crateIndex)
+
+            if (!isNormalAirdrop)
             {
-                case 0:
-                    StartAsync(startCratePhysics(crate, .15f));
-                    break;
-                case 1:
-                    StartAsync(startCratePhysics(crate, .3f));
-                    break;
-                case 2:
-                    StartAsync(startCratePhysics(crate, .45f));
-                    break;
-                default:
-                    StartAsync(startCratePhysics(crate, 0));
-                    break;
+                int crateIndex = crate.GetField<int>("crateIndex");
+                switch (crateIndex)
+                {
+                    case 0:
+                        StartAsync(startCratePhysics(crate, .15f));
+                        break;
+                    case 1:
+                        StartAsync(startCratePhysics(crate, .3f));
+                        break;
+                    case 2:
+                        StartAsync(startCratePhysics(crate, .45f));
+                        break;
+                    default:
+                        StartAsync(startCratePhysics(crate, 0));
+                        break;
+                }
             }
+            else
+                StartAsync(startCratePhysics(crate, 0));
 
             yield return Wait(5);
 
@@ -2161,6 +2212,15 @@ namespace AIZombiesSupreme
             crate.SetField("streak", AIZ.rng.Next(10));
             crate.SetField("owner", owner);
             mapEdit.makeUsable(crate, "carePackage", 75);
+
+            string iconName = getKillstreakCrateIcon(crate.GetField<int>("streak"));
+            Entity iconEnt = Spawn("script_origin", crate.Origin + new Vector3(0, 0, 30));
+            HudElem icon = hud.createCarePackageIcon(iconEnt, iconName);
+            crate.SetField("icon", icon);
+            List<Entity> iconPart = new List<Entity>();
+            iconPart.Add(iconEnt);
+            crate.SetField("pieces", new Parameter(iconPart));//Set to allow removeUsable to delete
+
             StartAsync(watchCrateUsage(crate));
         }
 
@@ -2208,6 +2268,17 @@ namespace AIZombiesSupreme
             Objective_Add(curObjID, "active", box.Origin, "compass_objpoint_deploy_friendly");
             box.SetField("objID", curObjID);
             mapEdit.addObjID(box, curObjID);
+
+            HudElem icon = NewTeamHudElem("allies");
+            icon.SetShader("waypoint_ammo_friendly", 8, 8);
+            icon.Alpha = .85f;
+            icon.X = box.Origin.X;
+            icon.Y = box.Origin.Y;
+            icon.Z = box.Origin.Z + 20;
+            icon.Archived = false;
+            icon.SetWaypoint(true, false);
+            box.SetField("icon", icon);
+
             AfterDelay(60000, () => destroyDeployableAmmo(box));
         }
         private static void destroyDeployableAmmo(Entity box)
@@ -2347,7 +2418,13 @@ namespace AIZombiesSupreme
             else if (AIZ._mapname == "mp_courtyard_ss")
             {
                 if (!mapStreakOut) startVolcanoEruption(player);
-                else return false;
+                else
+                {
+                    player.IPrintLnBold(AIZ.gameStrings[340]);
+                    player.SetField("cash", player.GetField<int>("cash") + 10000);
+                    hud.scorePopup(player, 10000);
+                    return true;
+                }
             }
             else if (AIZ._mapname == "mp_hillside_ss")
             {
@@ -3038,6 +3115,7 @@ namespace AIZombiesSupreme
                 TriggerFX(fx);
 
             botUtil.nukeDetonation(owner, true);
+            botUtil.spawnedBots = botUtil.botsForWave;
             PlaySoundAtPos(rumbleSound.Origin, "nuke_wave");
 
             yield return Wait(7);

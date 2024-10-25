@@ -53,7 +53,8 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="InfinityScript">
+    <Reference Include="InfinityScript, Version=1.5.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>H:\Steam\steamapps\common\Call of Duty Modern Warfare 3 - TeknoMW3\InfinityScript.dll</HintPath>
     </Reference>
     <Reference Include="System" />

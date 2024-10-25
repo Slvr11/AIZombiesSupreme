@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("AIZombies Supreme")]
 [assembly: AssemblyDescription("A zombies mod using real AI; a sequel for MW3 from the old MW2 days")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Silver Studios")]
+[assembly: AssemblyCompany("Slvr99")]
 [assembly: AssemblyProduct("AIZombies")]
 [assembly: AssemblyCopyright("Copyright © 2024")]
 [assembly: AssemblyTrademark("")]
@@ -33,6 +33,6 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.44.*")]
+[assembly: AssemblyVersion("1.5.*")]
 [assembly: NeutralResourcesLanguage("en-US")]
 

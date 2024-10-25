@@ -150,6 +150,9 @@ namespace AIZombiesSupreme
         {
             switch (type)
             {
+                case "sentryPickup":
+                    killstreaks.pickupSentry(player, ent.GetField<Entity>("turret"), false);
+                    break;
                 case "revive":
                     revivePlayer(ent, player);
                     break;
@@ -248,6 +251,13 @@ namespace AIZombiesSupreme
             {
                 removeObjID(usable);
             }
+            if (usable.HasField("icon"))
+            {
+                HudElem icon = usable.GetField<HudElem>("icon");
+                icon.Destroy();
+                usable.ClearField("icon");
+            }
+
             //Entity trigger = usable.GetField<Entity>("trigger");
             usables.Remove(usable);
             if (!usables.Contains(usable))
@@ -377,6 +387,17 @@ namespace AIZombiesSupreme
         {
             if (player.IsAlive)
             {
+                //Check revive triggers first
+                foreach (Entity usable in usables)
+                {
+                    if (usable.GetField<string>("usabletype") != "revive") continue;
+
+                    if (usable.HasField("range") && player.Origin.DistanceTo(usable.Origin) < usable.GetField<int>("range"))
+                    {
+                        executeUsable(usable.GetField<string>("usabletype"), player, usable);
+                        return;//We found a revive usable close enough, get out of this loop
+                    }
+                }
                 foreach (Entity usable in usables)
                 {
                     if (usable.HasField("range") && player.Origin.DistanceTo(usable.Origin) < usable.GetField<int>("range"))
@@ -454,6 +475,7 @@ namespace AIZombiesSupreme
                     downedPlayer.ShowHudSplash("revived", 1);
                     downedPlayer.EnableWeaponSwitch();
                     downedPlayer.EnableOffhandWeapons();
+                    StartAsync(AIZ.reviveGracePeriod(downedPlayer));
                     List<string> weaponList = downedPlayer.GetField<List<string>>("weaponsList");
                     if (!weaponList.Contains("iw5_usp45_mp"))
                     {
@@ -706,7 +728,7 @@ namespace AIZombiesSupreme
         #endregion
 
         #region stucture creators
-        public static void randomWeaponCrate(Vector3 origin, Vector3 angles, int? objID = null, int currentLoc = 0)
+        public static Entity randomWeaponCrate(Vector3 origin, Vector3 angles, int? objID = null, int currentLoc = 0)
         {
             Entity crate = spawnCrate(origin, angles, false, false);
             int curObjID;
@@ -747,7 +769,7 @@ namespace AIZombiesSupreme
 
             if (Entity.Level.HasField("isXmas"))
                 AIZ.spawnXmasLightsOnUsable(crate);
-            //return crate;
+            return crate;
         }
         private static bool rotateWeaponCrateWeapon(Entity weapon, Entity crate)
         {
@@ -1465,6 +1487,11 @@ namespace AIZombiesSupreme
                     box.PlaySound("copycat_steal_class");
                     AIZ.currentThunderguns++;
                 }
+                else if (name == "stinger_mp")
+                {
+                    box.PlaySound("copycat_steal_class");
+                    AIZ.currentZappers++;
+                }
 
                 if ((player.GetField<bool>("perk4bought") && player.GetField<bool>("newGunReady") && player.GetField<string>("perk4weapon") == "") || (player.GetField<bool>("perk4bought") && player.GetField<string>("perk4weapon") != name && player.CurrentWeapon == player.GetField<string>("perk4weapon")))
                     player.SetField("perk4weapon", name);
@@ -1473,13 +1500,19 @@ namespace AIZombiesSupreme
                     AIZ.currentThunderguns--;
                 else if (AIZ.isRayGun(player.CurrentWeapon))
                     AIZ.currentRayguns--;
+                else if (player.CurrentWeapon == "stinger_mp")
+                    AIZ.currentZappers--;
 
                 if (!player.HasWeapon(name) && !player.GetField<bool>("newGunReady"))
                 {
                     if (name != "lightstick_mp")
                     {
-                        AIZ.updatePlayerWeaponsList(player, player.CurrentWeapon, true);
-                        player.TakeWeapon(player.CurrentWeapon);
+                        var currentWeapon = player.CurrentWeapon;
+                        if (player.CurrentWeapon.StartsWith("alt_"))//Fix alt weapons allowing players to take multiple weapons
+                            currentWeapon = currentWeapon.Substring(4);
+
+                        AIZ.updatePlayerWeaponsList(player, currentWeapon, true);
+                        player.TakeWeapon(currentWeapon);
                         hud.updateAmmoHud(player, true, name);
                     }
                     else hud.updateAmmoHud(player, false);
@@ -1558,7 +1591,7 @@ namespace AIZombiesSupreme
             yield return Wait(3);
 
             bool isBear = RandomInt(boxMaxUses) == boxMaxUses - 1;//Random number is max
-            if (isBear && boxMaxUses < 13 && !sale)
+            if (isBear && boxMaxUses < 13 && !sale && player.GetField<bool>("hasUsedBox"))
             {
                 if (AIZ._mapname != "mp_six_ss") weapon.Angles -= new Vector3(0, 90, 0);
                 StartAsync(moveWeaponBox(box, weapon));
@@ -1569,10 +1602,13 @@ namespace AIZombiesSupreme
             }
             else if (!sale) boxMaxUses--;
 
+            player.SetField("hasUsedBox", true);
+
             if ((localizedNames[boxIndex] == "Ray Gun" && (AIZ.currentRayguns >= AIZ.maxRayguns || (player.HasWeapon("iw5_skorpion_mp_eotechsmg_scope07") || player.HasWeapon("iw5_skorpion_mp_eotechsmg_xmags_scope07"))))
-            || (localizedNames[boxIndex] == "Thundergun" && (AIZ.currentThunderguns >= AIZ.maxThunderguns || (player.HasWeapon("uav_strike_missile_mp") || player.HasWeapon("uav_strike_projectile_mp")))))
+            || (localizedNames[boxIndex] == "Thundergun" && (AIZ.currentThunderguns >= AIZ.maxThunderguns || (player.HasWeapon("uav_strike_missile_mp") || player.HasWeapon("uav_strike_projectile_mp"))))
+            || (weaponNames[boxIndex] == "stinger_mp" && AIZ.currentZappers > 0))
             {
-                boxIndex = (byte)AIZ.rng.Next(weaponModels.Length - 2);
+                boxIndex = (byte)AIZ.rng.Next(weaponModels.Length - 3);
                 weapon.SetModel(weaponModels[boxIndex]);
             }
 
@@ -1956,7 +1992,7 @@ namespace AIZombiesSupreme
         {
             box.SetField("GamblerInUse", false);
             if (!player.IsAlive) return;
-            switch (AIZ.rng.Next(22))
+            switch (AIZ.rng.Next(24))
             {
                 case 0:
                     //Extra weapon
@@ -2186,6 +2222,13 @@ namespace AIZombiesSupreme
                     //model1887
                     player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "a Model 1887"));
 
+                    if (player.HasWeapon("iw5_1887_mp"))
+                    {
+                        player.GiveMaxAmmo("iw5_1887_mp");
+                        StartAsync(AIZ.switchToWeapon_delay(player, "iw5_1887_mp", .1f));
+                        return;
+                    }
+
                     if (AIZ.isThunderGun(player.CurrentWeapon))
                         AIZ.currentThunderguns--;
                     else if (AIZ.isRayGun(player.CurrentWeapon))
@@ -2263,6 +2306,47 @@ namespace AIZombiesSupreme
                     int randomStreak = AIZ.rng.Next(1, 12);
                     killstreaks.giveKillstreak(player, randomStreak);
                     
+                    break;
+                case 22:
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "a free pack-a-punch"));
+
+                    string currentGun = player.GetCurrentWeapon();
+                    if (AIZ.getWeaponUpgrade(currentGun) == "")
+                    {
+                        player.SetField("cash", player.GetField<int>("cash") + 5000);
+                        hud.scorePopup(player, 5000);
+                        return;
+                    }
+
+                    string newWeapon = AIZ.getWeaponUpgrade(currentGun);
+                    int ammoClip = player.GetWeaponAmmoClip(currentGun);
+                    int ammoStock = player.GetWeaponAmmoStock(currentGun);
+                    player.TakeWeapon(currentGun);
+                    AIZ.updatePlayerWeaponsList(player, currentGun, true);
+                    player.GiveWeapon(newWeapon);
+
+                    player.SetWeaponAmmoClip(newWeapon, ammoClip);
+                    player.SetWeaponAmmoStock(newWeapon, ammoStock);
+                    AIZ.updatePlayerWeaponsList(player, newWeapon);
+                    player.PlayLocalSound("elev_bell_ding");
+
+                    StartAsync(AIZ.switchToWeapon_delay(player, newWeapon, .1f));
+                    break;
+                case 23:
+                    player.IPrintLnBold(string.Format(AIZ.gameStrings[249], "a random weapon"));
+
+                    var playerCurrentWeapon = player.GetCurrentWeapon();
+                    var newWeaponIndex = RandomInt(weaponNames.Length);
+                    var randomWeapon = weaponNames[newWeaponIndex];
+                    if (AIZ.rng.Next(100) > 75 && AIZ.getWeaponUpgrade(randomWeapon) != "")
+                        newWeapon = AIZ.getWeaponUpgrade(randomWeapon);
+                    player.TakeWeapon(playerCurrentWeapon);
+                    AIZ.updatePlayerWeaponsList(player, playerCurrentWeapon, true);
+                    player.GiveWeapon(randomWeapon);
+                    player.GiveMaxAmmo(randomWeapon);
+                    AIZ.updatePlayerWeaponsList(player, randomWeapon);
+
+                    StartAsync(AIZ.switchToWeapon_delay(player, randomWeapon, 0.1f));
                     break;
                 default:
                     player.IPrintLnBold(string.Format(AIZ.gameStrings[247], "nothing"));
@@ -2361,6 +2445,8 @@ namespace AIZombiesSupreme
                 int points = player.GetField<int>("points");
                 pointNumber.SetValue(points);
                 int randomKS = AIZ.rng.Next(1, 12);
+                while (randomKS == 3)//EMPs are useless from this since power needs to be on to use it
+                    randomKS = AIZ.rng.Next(1, 12);
                 killstreaks.giveKillstreak(player, randomKS);
             }
         }
@@ -2620,7 +2706,15 @@ namespace AIZombiesSupreme
                 player.Health = AIZ.maxPlayerHealth_Jugg;
             }
             else if (perk == 4)
+            {
                 player.SetField("NewGunReady", true);
+                if (player.GetField<List<string>>("weaponsList").Count < 2)
+                {
+                    //Give hand-gun to fill second slot if the player only has one gun
+                    player.GiveWeapon("defaultweapon_mp");
+                    AIZ.updatePlayerWeaponsList(player, "defaultweapon_mp");
+                }
+            }
             else if (perk == 7)
                 player.SetField("autoRevive", true);
             if (perk != 7) player.SetField("perk" + perk + "bought", true);
@@ -2734,6 +2828,9 @@ namespace AIZombiesSupreme
             if (AIZ.gameEnded) return string.Empty;
             switch (usable.GetField<string>("usabletype"))
             {
+                case "sentryPickup":
+                    if (usable.GetField<Entity>("turret").GetField<bool>("isBeingCarried") || usable.GetField<Entity>("turret").GetField<Entity>("owner") != player) return "";
+                    return AIZ.gameStrings[80];
                 case "revive":
                     Entity downed = usable.GetField<Entity>("player");
                     if (player == downed || usable.GetField<Entity>("user") == player) return "";
@@ -3219,21 +3316,62 @@ namespace AIZombiesSupreme
         {
             if (sale) return;
 
-            Entity fx = null;
+            if (AIZ.fullFireSale)
+                PopulateAllBoxLocations();
+
             foreach (Entity usable in usables)
             {
                 if (usable.HasField("usabletype") && usable.GetField<string>("usabletype") == "randombox")
                 {
-                    fx = SpawnFX(AIZ.fx_smallFire, usable.GetField<Entity>("weaponEnt").Origin);
+                    Entity fx = SpawnFX(AIZ.fx_smallFire, usable.GetField<Entity>("weaponEnt").Origin);
                     TriggerFX(fx);
                     //usable.PlayLoopSound("elev_musak_loop");
+                    OnInterval(1000, () => deleteSaleFXOnEnd(fx));
+                }
+            }
+        }
+        private static void PopulateAllBoxLocations()
+        {
+            Entity currentBox = null;
+            foreach (Entity usable in usables)
+            {
+                if (!IsDefined(usable) || !usable.HasField("usabletype"))
+                    continue;
+
+                if (usable.GetField<string>("usabletype") == "randombox")
+                {
+                    currentBox = usable;
+                    break;
                 }
             }
 
-            if (fx == null) return;
+            if (currentBox == null)
+                return;
 
-            OnInterval(1000, () => deleteSaleFXOnEnd(fx));
+            int currentBoxLocationIndex = currentBox.GetField<int>("lastLocation");
 
+            for (int i = 0; i < boxLocations.Length; i++)
+            {
+                if (i == currentBoxLocationIndex)
+                    continue;
+
+                Entity box = randomWeaponCrate(boxLocations[i][0], boxLocations[i][1], 0, i);
+                OnInterval(50, () => RemoveBoxAfterSale(box));
+            }
+        }
+        private static bool RemoveBoxAfterSale(Entity box)
+        {
+            if (sale) return true;
+
+            if (box.GetField<string>("state") != "idle")
+                return true;
+
+            box.GetField<Entity>("weaponEnt").Delete();
+            PlayFX(AIZ.fx_disappear, box.Origin);
+
+            removeUsable(box);
+
+            return false;
         }
 
         private static bool deleteSaleFXOnEnd(Entity fx)
@@ -3255,16 +3393,6 @@ namespace AIZombiesSupreme
             ent.SetField("trigger", trigger);
             */
             usables.Add(ent);
-        }
-
-        public static void loadMapEditHotfix(string hotfix)
-        {
-            //TextReader mapFile = File.OpenText(maplist[randomMap]);
-            //string lastEdit = mapFile.ReadToEnd();
-            //string[] edits = lastEdit.Split('\n');
-
-            AIZ.printToConsole("Adding map hotfix line: {0}", hotfix);
-            spawnMapEditObject(hotfix);
         }
 
         public static void loadMapEdit(string mapname)
@@ -3706,6 +3834,24 @@ namespace AIZombiesSupreme
                             ent.Delete();
                         }
                     }
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Tunnels of Death")
+                    {
+                        //Additional Art
+                        spawnModel("mil_sandbag_desert_short", new Vector3(550, 4775, 12), new Vector3(0, 90, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(475, 4775, 12), new Vector3(0, 90, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(400, 4775, 12), new Vector3(0, 90, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(325, 4775, 12), new Vector3(0, 90, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(250, 4775, 12), new Vector3(0, 90, 0));
+
+                        spawnModel("mil_sandbag_desert_short", new Vector3(50, 4535, -7), new Vector3(0, -10, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(40, 4460, -7), new Vector3(0, -10, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(30, 4385, -7), new Vector3(0, -10, 0));
+
+                        spawnModel("mil_sandbag_desert_short", new Vector3(0, 4200, -7), new Vector3(0, -10, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(-10, 4125, -7), new Vector3(0, -10, 0));
+                        spawnModel("mil_sandbag_desert_short", new Vector3(-20, 4050, -7), new Vector3(0, -10, 0));
+                    }
                     break;
                 case "mp_carbon":
                     for (int i = 18; i < 2000; i++)
@@ -3726,6 +3872,17 @@ namespace AIZombiesSupreme
                             ent.Delete();
                         }
                     }
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Zaring Industries")
+                    {
+                        //Additional Art
+                        spawnModel("vehicle_v22_osprey_rear_door_mp", new Vector3(-2894, -4035, 3615), new Vector3(90, 90, 0));
+
+                        spawnModel("vehicle_v22_osprey_rear_door_mp", new Vector3(-3225, -3760, 3615), new Vector3(90, 0, 0));
+                        spawnModel("vehicle_v22_osprey_rear_door_mp", new Vector3(-3225, -3700, 3615), new Vector3(90, 0, 0));
+
+                        spawnModel("vehicle_v22_osprey_rear_door_mp", new Vector3(-3075, -3540, 3615), new Vector3(90, 0, 0));
+                    }
                     break;
                 case "mp_cement":
                     for (int i = 18; i < 2000; i++)
@@ -3745,6 +3902,76 @@ namespace AIZombiesSupreme
                             }
                             ent.Delete();
                         }
+                    }
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Silla Cement")
+                    {
+                        //Additional Art
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6950, 1109, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6890, 1209, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6830, 1309, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6770, 1409, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6710, 1509, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6650, 1609, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6590, 1709, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6530, 1809, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6470, 1909, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6410, 2009, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6350, 2109, 296), new Vector3(0, 60, 0));
+                        spawnModel("machinery_railing_single_long02", new Vector3(-6290, 2209, 296), new Vector3(0, 60, 0));
+
+                        spawnModel("machinery_railing_single_long01", new Vector3(-6000, -860, 296), new Vector3(0, 135, 0));
+
+                        spawnModel("cement_fence_construction_02", new Vector3(-6500, -630, 296), new Vector3(0, 0, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-6615, -630, 296), new Vector3(0, 0, 0));
+
+                        spawnModel("cement_fence_construction_02", new Vector3(-6925, -630, 296), new Vector3(0, 0, 0));
+
+                        spawnModel("cement_fence_construction_02", new Vector3(-4485, -560, 296), new Vector3(0, 195, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-4580, -585, 296), new Vector3(0, 195, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-4675, -610, 296), new Vector3(0, 195, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-4770, -635, 296), new Vector3(0, 195, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-4865, -660, 296), new Vector3(0, 195, 0));
+                        spawnModel("cement_fence_construction_02", new Vector3(-4960, -685, 296), new Vector3(0, 195, 0));
+                    }
+                    break;
+                case "mp_courtyard_ss":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Dead Aqueduct")
+                    {
+                        //Clear spawns
+                        botUtil.botSpawns.Clear();
+                        botUtil.spawnAngles.Clear();
+
+                        //Additional Art
+                        spawnModel("aq_debris_pile", new Vector3(675, -1490, 75), new Vector3(-45, 0, 0));
+
+                        spawnModel("jeepride_shrubgroup_01", new Vector3(-494, -25, 25), new Vector3(0, -90, 0));
+                        spawnModel("intro_alleyway_gate_01", new Vector3(-260, -360, 125), new Vector3(0, 0, 0));
+                        spawnModel("intro_alleyway_gate_01", new Vector3(-250, -360, 125), new Vector3(0, 180, 0));
+
+                        spawnModel("aq_column_01", new Vector3(-975, -1275, 130), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-975, -1310, 130), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-975, -1240, 130), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-975, -1260, 155), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-975, -1305, 155), new Vector3(0, 0, 0));
+
+                        spawnModel("aq_column_01", new Vector3(-890, -975, 125), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-850, -975, 125), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-930, -975, 125), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-870, -975, 150), new Vector3(0, 0, 0));
+                        spawnModel("aq_column_01", new Vector3(-910, -975, 150), new Vector3(0, 0, 0));
+
+                        spawnModel("aq_crate01", new Vector3(790, 140, 125), new Vector3(0, 0, 0));
+                        spawnModel("aq_crate01", new Vector3(790, 100, 150), new Vector3(0, 0, 90));
+                        spawnModel("aq_crate01", new Vector3(260, 125, 125), new Vector3(0, 0, 0));
+                        spawnModel("aq_crate01", new Vector3(260, 185, 150), new Vector3(0, 0, 90));
+
+                        //Setup new spawn system
+                        Erosion_CreateProgressArea(new Vector3(-552, -1534, 30), 448, 256, 0);
+                        Erosion_CreateProgressArea(new Vector3(-608, -627, 0), 448, 256, 1);
+                        Erosion_CreateProgressArea(new Vector3(531, -651, 0), 512, 256, 2);
+                        Erosion_CreateProgressArea(new Vector3(351, -1556, 0), 384, 256, 3);
                     }
                     break;
                 case "mp_lambeth":
@@ -3774,6 +4001,78 @@ namespace AIZombiesSupreme
                     {
                         //Patch out of bounds
                         createWall(new Vector3(-234, -4560, -271), new Vector3(-232, -3598, -240), true, false);
+                    }
+                    else if (AIZ._mapname == "mp_burn_ss")
+                    {
+                        if (AIZ.getZombieMapname() == "Freeway Escape")
+                        {
+                            //Additional Art
+                            spawnModel("junk_scrap_pile_01", new Vector3(1800, -250, 50), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(1800, -400, 50), new Vector3(0, 270, 0));
+
+                            spawnModel("me_streetlight", new Vector3(1775, -648, 80), new Vector3(-43, -7, 94));
+                            spawnModel("junk_scrap_pile_01", new Vector3(1800, -750, -25), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(1800, -950, -35), new Vector3(0, 270, 0));
+                        }
+                        else if (AIZ.getZombieMapname() == "Hideout of Hell")
+                        {
+                            //Additional Art
+                            //spawnModel("me_streetlight", new Vector3(-625, -500, 115), new Vector3(0, 0, 102));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-590, -800, -30), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-575, -950, -25), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-975, -800, -30), new Vector3(0, 90, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-975, -950, -25), new Vector3(0, 90, 0));
+
+                            spawnModel("junk_scrap_pile_01", new Vector3(-590, 700, -30), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-575, 850, -25), new Vector3(0, 270, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-975, 700, -30), new Vector3(0, 90, 0));
+                            spawnModel("junk_scrap_pile_01", new Vector3(-975, 850, -25), new Vector3(0, 90, 0));
+                        }
+                    }
+                    else if (AIZ.getZombieMapname() == "Pandemic Bridge" && AIZ._mapname == "mp_crosswalk_ss")
+                    {
+                        //Additional Art
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(4125, -1450, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(4200, -1570, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(4275, -1690, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(4350, -1810, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(4415, -1920, 2972), new Vector3(0, 120, 0));
+
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(350, -3985, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(425, -4105, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(500, -4225, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(575, -4345, 2972), new Vector3(0, 120, 0));
+                        spawnModel("ny_barrier_pedestrian_01_ns", new Vector3(640, -4455, 2972), new Vector3(0, 120, 0));
+                    }
+                    else if (AIZ.getZombieMapname() == "Oceanside Attack" && AIZ._mapname == "mp_hillside_ss")
+                    {
+                        //Additional Art
+                        spawnModel("prk_river_rock_03", new Vector3(2600, -825, 2050), new Vector3(0, 245, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2400, -825, 2060), new Vector3(0, 245, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2200, -825, 2070), new Vector3(0, 245, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2000, -825, 2080), new Vector3(0, 245, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(1800, -825, 2090), new Vector3(0, 245, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(1600, -825, 2100), new Vector3(0, 245, 0));
+
+                        spawnModel("prk_river_rock_03", new Vector3(1220, 1075, 2150), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(1420, 1075, 2125), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(1620, 1075, 2100), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(1820, 1075, 2090), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2020, 1100, 2080), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2220, 1100, 2070), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2420, 1125, 2060), new Vector3(0, 65, 0));
+                        spawnModel("prk_river_rock_03", new Vector3(2620, 1150, 2050), new Vector3(0, 65, 0));
+                    }
+                    else if (AIZ.getZombieMapname() == "Liberty Bridge" && AIZ._mapname == "mp_plaza2")
+                    {
+                        //Additional Art
+                        spawnModel("berlin_utility_parking_lot_gate_down", new Vector3(1465, 2390, 655), new Vector3(0, 25, 0));
+                        spawnModel("berlin_utility_parking_lot_gate_down", new Vector3(2263, 2775, 645), new Vector3(0, 205, 0));
+                        spawnModel("mil_razorwire_mid_static", new Vector3(2018, 2600, 610), new Vector3(0, 25, 0));
+                        spawnModel("mil_razorwire_mid_static", new Vector3(1775, 2500, 610), new Vector3(0, 25, 0));
+                        spawnModel("mil_razorwire_mid_static", new Vector3(1550, 2400, 610), new Vector3(0, 25, 0));
+
+                        spawnModel("mil_razorwire_mid_static", new Vector3(300, 4750, 600), new Vector3(0, 25, 0));
                     }
                     break;
                 case "mp_bootleg":
@@ -3815,6 +4114,26 @@ namespace AIZombiesSupreme
                             }
                         }
                     }
+                    if (AIZ.getZombieMapname() == "Rundown Church")
+                    {
+                        //Additional Art
+                        spawnModel("ch_woodfence02", new Vector3(1200, -500, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -575, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -650, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -725, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -800, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -875, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -950, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -1025, 1087), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -1100, 1087), new Vector3(0, 90, 0));
+
+                        spawnModel("ch_woodfence02", new Vector3(1200, -125, 1125), new Vector3(0, 90, 0));
+                        spawnModel("ch_woodfence02", new Vector3(1200, -200, 1125), new Vector3(0, 90, 0));
+
+                        spawnModel("ch_woodfence02", new Vector3(1350, 265, 1160), new Vector3(0, 75, 0));
+
+                        spawnModel("ch_woodfence02", new Vector3(1432, 340, 1175), new Vector3(0, 10, 0));
+                    }
                     break;
                 case "mp_exchange":
                     for (int i = 18; i < 1000; i++)
@@ -3827,6 +4146,23 @@ namespace AIZombiesSupreme
                         {
                             ent.Origin -= new Vector3(0, 0, 10000);
                         }
+                    }
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Abandoned Subway")
+                    {
+                        //Additional Art
+                        spawnModel("concrete_pillarchunk_lrg_01", new Vector3(550, 725, -25), new Vector3(0, 120, 90));
+                        spawnModel("concrete_pillarchunk_lrg_01", new Vector3(825, -375, -25), new Vector3(0, 130, 90));
+                    }
+                    break;
+                case "mp_meteora":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Sanctuary Of Hell")
+                    {
+                        //Additional Art
+                        spawnModel("me_iron_gate", new Vector3(-1393, 1775, 1425), new Vector3(0, 90, 0));
+                        spawnModel("me_iron_gate", new Vector3(-2015, 1775, 1425), new Vector3(0, 90, 0));
+                        spawnModel("me_iron_gate", new Vector3(-1393, 2325, 1425), new Vector3(0, 90, 0));
                     }
                     break;
                 case "mp_terminal_cls":
@@ -3849,6 +4185,37 @@ namespace AIZombiesSupreme
                                 ent.Delete();
                             }
                         }
+
+                        //Fix xLimit getting players stuck
+                        setupSpaceLimit(true, -1800, -34);
+
+                        //Additional Art
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 4500, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 4325, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 3700, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 3500, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 3000, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 2800, 40), new Vector3(0, 0, 0));
+                        spawnModel("vehicle_cart_baggage_airport_big", new Vector3(-1900, 2600, 40), new Vector3(0, 0, 0));
+
+                        spawnModel("police_barrier_01", new Vector3(-1800, 2550, 40), new Vector3(0, -10, 0));
+                        spawnModel("police_barrier_01", new Vector3(-1650, 2550, 40), new Vector3(0, 0, 0));
+                        spawnModel("police_barrier_01", new Vector3(-1500, 2550, 40), new Vector3(0, 10, 0));
+                        spawnModel("police_barrier_01", new Vector3(-1300, 2550, 40), new Vector3(0, 0, 0));
+                        spawnModel("police_barrier_01", new Vector3(-1000, 2550, 40), new Vector3(0, 15, 0));
+                        spawnModel("police_barrier_01", new Vector3(-800, 2550, 40), new Vector3(0, -10, 0));
+                        spawnModel("police_barrier_01", new Vector3(-500, 2550, 40), new Vector3(0, 0, 0));
+                        spawnModel("police_barrier_01", new Vector3(-500, 2550, 40), new Vector3(0, 15, 0));
+                        spawnModel("police_barrier_01", new Vector3(-300, 2550, 40), new Vector3(0, 10, 0));
+                        spawnModel("police_barrier_01", new Vector3(-50, 2550, 40), new Vector3(0, 3, 0));
+                    }
+                    else if (AIZ.getZombieMapname() == "Death Row")
+                    {
+                        //Additional Art
+                        spawnModel("cs_handrail_128_double_yel", new Vector3(2300, 4435, 190), new Vector3(0, 90, 0));
+                        spawnModel("cs_handrail_128_double_yel", new Vector3(2400, 4435, 190), new Vector3(0, 90, 0));
+                        spawnModel("cs_handrail_128_double_yel", new Vector3(2500, 4435, 190), new Vector3(0, 90, 0));
+                        spawnModel("cs_handrail_128_double_yel", new Vector3(2600, 4435, 190), new Vector3(0, 90, 0));
                     }
                     else if (AIZ.getZombieMapname() == "Burger Town Of Death")
                     {
@@ -3892,6 +4259,15 @@ namespace AIZombiesSupreme
                                 ent.Origin -= new Vector3(0, 0, 10000);//Move triggers away from map since dmg doesn't set properly
                             }
                         }
+
+                        //Additional Art
+                        spawnModel("afr_bg_boulder_03", new Vector3(-1725, -1500, 102), new Vector3(0, 90, 0));
+                        spawnModel("afr_bg_boulder_03", new Vector3(-1725, -1700, 102), new Vector3(0, -90, 0));
+                        spawnModel("afr_bg_boulder_03", new Vector3(-1725, -1900, 102), new Vector3(0, 90, 0));
+
+                        spawnModel("afr_bg_boulder_03", new Vector3(1990, -1400, 95), new Vector3(0, 90, 0));
+                        spawnModel("afr_bg_boulder_03", new Vector3(1990, -1600, 75), new Vector3(0, -90, 0));
+                        spawnModel("afr_bg_boulder_03", new Vector3(1990, -1800, 50), new Vector3(0, 90, 0));
                     }
                     break;
                 case "mp_hardhat":
@@ -3918,11 +4294,120 @@ namespace AIZombiesSupreme
                             {
                                 if (usable.Origin.DistanceTo(new Vector3(-1654, 1641, 1206)) < 5)
                                 {
-                                    usable.Origin = new Vector3(-1658, 1629, 1195);
+                                    usable.Origin = new Vector3(-1658, 1629, 1150);
                                     usable.Angles = new Vector3(90, 62, 0);
                                 }
                             }
                         }
+
+                        //Additional Art
+                        spawnModel("md_iron_gate", new Vector3(-1360, 2305, 1161), new Vector3(0, 60, 0));
+                        spawnModel("md_iron_gate", new Vector3(-1600, 2450, 1161), new Vector3(0, 240, 0));
+
+                        spawnModel("md_wood_stack_01", new Vector3(-1975, 2050, 1150), new Vector3(0, 60, 0));
+
+                        spawnModel("md_wood_stack_01", new Vector3(-1350, 1960, 1150), new Vector3(0, 150, 0));
+
+                        spawnModel("md_wood_stack_01", new Vector3(-1715, 1215, 1152), new Vector3(0, 150, -10));
+                        spawnModel("md_wood_stack_01", new Vector3(-1715, 1200, 1125), new Vector3(0, 150, 0));
+                    }
+                    else if (AIZ.getZombieMapname() == "Glass Palace")
+                    {
+                        //Additional Art
+                        spawnModel("md_iron_gate", new Vector3(-2550, -5225, 256), new Vector3(0, 0, 0));
+                    }
+                    break;
+                case "mp_nola":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Parkside Invasion")
+                    {
+                        //Additional Art
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -450, 12), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -375, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -292, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -210, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -120, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, -45, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, 30, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, 200, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(2015, 275, 8), new Vector3(0, 90, 0));
+
+                        spawnModel("mp_cw_construction_barrier", new Vector3(700, 325, 16), new Vector3(0, 0, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(780, 325, 16), new Vector3(0, 0, 0));
+                    }
+                    else if (AIZ.getZombieMapname() == "Death Avenue")
+                    {
+                        //Add wall to ending area
+                        createWall(new Vector3(-4285, 272, 20), new Vector3(-4285, -160, 110), true, false);
+                        //Additional Art
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, 250, 12), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, 175, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, 100, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, 25, 8), new Vector3(0, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, -50, 12), new Vector3(3, 90, 0));
+                        spawnModel("mp_cw_construction_barrier", new Vector3(-4285, -125, 12), new Vector3(0, 90, 0));
+                    }
+                    break;
+                case "mp_overwatch":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Death In Progress")
+                    {
+                        //Remove duplicate perk3
+                        foreach (Entity usable in usables)
+                        {
+                            if (usable.GetField<string>("usabletype") == "perk3")
+                            {
+                                removeUsable(usable);
+                                break;
+                            }
+                        }
+
+                        //Additional Art
+                        spawnModel("prop_bm21_crte_clsed", new Vector3(315, 1500, 12868), new Vector3(0, 90, 0));
+                        spawnModel("prop_bm21_crte_clsed", new Vector3(410, 1500, 12875), new Vector3(0, 90, 7));
+
+                        spawnModel("prop_bm21_crte_clsed", new Vector3(630, 375, 12864), new Vector3(0, 125, 0));
+
+                        spawnModel("ow_construction_woodplankpile_01_ns", new Vector3(-650, 640, 12842), new Vector3(0, 130, 0));
+
+                        spawnModel("prop_bm21_crte_clsed", new Vector3(-650, 385, 12864), new Vector3(0, 55, 0));
+
+                        spawnModel("prop_bm21_crte_clsed", new Vector3(-400, 1641, 12864), new Vector3(0, 20, 0));
+                    }
+                    break;
+                case "mp_park":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Wartorn")
+                    {
+                        //Additional Art
+                        spawnModel("mil_sandbag_desert_short", new Vector3(2310, -850, 200), new Vector3(0, -25, 0));
+
+                        spawnModel("mil_barbedwire4", new Vector3(1500, -115, -10), new Vector3(-10, 150, 0));
+                        spawnModel("mil_barbedwire4", new Vector3(1615, -165, -10), new Vector3(10, 150, 0));
+
+                        spawnModel("mil_sandbag_desert_short", new Vector3(550, -6, 152), new Vector3(0, -25, 0));
+                    }
+                    break;
+                case "mp_radar":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Snowy Outpost")
+                    {
+                        //Additional Art
+                        spawnModel("cs_handrail_128_double_yel", new Vector3(-5855, 3568, 1334), new Vector3(0, 0, 0));
+                    }
+                    break;
+                case "mp_seatown":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "The Wishing Well")
+                    {
+                        //Additional Art
+                        spawnModel("com_pallet_stack", new Vector3(-2675, -3430, 190), new Vector3(0, 0, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2600, -3430, 190), new Vector3(0, 90, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2525, -3430, 182), new Vector3(0, 180, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2450, -3430, 190), new Vector3(0, 180, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2375, -3430, 182), new Vector3(0, 270, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2190, -3430, 173), new Vector3(0, 0, 0));
+                        spawnModel("com_pallet_stack", new Vector3(-2100, -3430, 173), new Vector3(0, 0, 0));
                     }
                     break;
                 case "mp_shipbreaker":
@@ -3932,8 +4417,90 @@ namespace AIZombiesSupreme
                         //Close up broken wall by the large crane
                         createWall(new Vector3(97, 183, 759), new Vector3(17, 52, 934), true, false);
                     }
+                    else if (AIZ.getZombieMapname() == "Scrapped Port")
+                    {
+                        //Additional Art
+                        spawnModel("slava_pier_railings_06_dest", new Vector3(3725, -3343, 709), new Vector3(0, 30, 0));
+                    }
+                    break;
+                case "mp_village":
+                    yield return WaitForFrame();
+                    if (AIZ.getZombieMapname() == "Death Bridge")
+                    {
+                        //Additional Art
+                        spawnModel("afr_twig_fence_02a", new Vector3(0, 1915, 264), new Vector3(0, 20, 0));
+                        spawnModel("afr_twig_fence_02a", new Vector3(-100, 1885, 264), new Vector3(0, 20, 0));
+                        spawnModel("afr_twig_fence_02a", new Vector3(-200, 1860, 264), new Vector3(0, 20, 0));
+
+                        spawnModel("afr_twig_fence_02a", new Vector3(-1790, 975, 270), new Vector3(0, 30, 0));
+                        spawnModel("afr_twig_fence_02a", new Vector3(-1900, 920, 270), new Vector3(0, 30, 0));
+                        spawnModel("afr_twig_fence_02a", new Vector3(-2010, 860, 270), new Vector3(0, 30, 0));
+                    }
                     break;
             }
+        }
+        private static void Erosion_CreateProgressArea(Vector3 pos, int radius, int height, int num)
+        {
+            Entity trigger = Spawn("trigger_radius", pos, 0, radius, height);
+            OnInterval(1000, () => Erosion_PlayerEnterArea(trigger, radius, num));
+        }
+        private static bool Erosion_PlayerEnterArea(Entity trigger, int radius, int num)
+        {
+            bool hasBeenTouched = false;
+            foreach (var player in Players)
+            {
+                if (!player.IsAlive)
+                    continue;
+
+                if (player.IsTouching(trigger))
+                {
+                    hasBeenTouched = true;
+                    break;
+                }
+            }
+
+            if (!hasBeenTouched)
+                return true;
+
+            switch (num)
+            {
+                case 0:
+                    Erosion_Zone1();
+                    break;
+                case 1:
+                    Erosion_Zone2();
+                    break;
+                case 2:
+                    Erosion_Zone3();
+                    break;
+                case 3:
+                    Erosion_Zone4();
+                    break;
+            }
+
+            trigger.Delete();
+
+            return false;
+        }
+        private static void Erosion_Zone1()
+        {
+            spawnMapEditObject("zombiespawn: (-961.368, -1277.691, 128.1244) ; (0, 3.572388, 0)");
+            spawnMapEditObject("zombiespawn: (-834.707, -1845.905, 122.1269) ; (0, 92.94617, 0)");
+        }
+        private static void Erosion_Zone2()
+        {
+            spawnMapEditObject("zombiespawn: (-495.0684, 94.01765, 70.68504) ; (0, -90.08604, 0)");
+            spawnMapEditObject("zombiespawn: (-250.0462, -377.6604, 128.125) ; (0, -99.43541, 0)");
+        }
+        private static void Erosion_Zone3()
+        {
+            spawnMapEditObject("zombiespawn: (667.4779, -495.157, 129.7398) ; (0, -92.56346, 0)");
+            spawnMapEditObject("zombiespawn: (786.2244, 116.314, 128.125) ; (0, -179.7894, 0)");
+            spawnMapEditObject("zombiespawn: (268.9368, 146.4736, 129) ; (0, -2.382202, 0)");
+        }
+        private static void Erosion_Zone4()
+        {
+            spawnMapEditObject("zombiespawn: (781.4849, -1476.622, 128.125) ; (0, -179.9267, 0)");
         }
         private static IEnumerator terminal_buildGates(Entity[] gates)
         {
@@ -4008,9 +4575,8 @@ namespace AIZombiesSupreme
             }
         }
         */
-        public static void cleanLevelEnts()
+        public static IEnumerator cleanLevelEnts()
         {
-            //yield return Wait(.1f);
             for (int i = 18; i < 2000; i++)
             {
                 Entity ent = GetEntByNum(i);
@@ -4023,7 +4589,27 @@ namespace AIZombiesSupreme
                 entTargetName == "flag_descriptor" ||
                 entTargetName == "remote_uav_range" ||
                 entTargetName == "radiotrigger" ||
-                (entTargetName == "grnd_zone" || entTargetName == "grnd_dropZone"))
+                (entTargetName == "grnd_zone" || entTargetName == "grnd_dropZone") ||
+                entClassName == "misc_turret")
+                    ent.Delete();
+            }
+
+            yield return Wait(.1f);
+
+            for (int i = 18; i < 2000; i++)//Second pass to grab additional spawned stuff
+            {
+                Entity ent = GetEntByNum(i);
+                if (ent == null) continue;
+                string entTargetName = ent.TargetName;
+                string entClassName = ent.Classname;
+                if (entTargetName.StartsWith("killCamEnt_") ||
+                (entClassName.StartsWith("mp_") && !entClassName.StartsWith("mp_tdm") && !entClassName.StartsWith("mp_global")) ||
+                entTargetName.StartsWith("auto") || entTargetName.StartsWith("heli_") ||
+                entTargetName == "flag_descriptor" ||
+                entTargetName == "remote_uav_range" ||
+                entTargetName == "radiotrigger" ||
+                (entTargetName == "grnd_zone" || entTargetName == "grnd_dropZone") ||
+                entClassName == "misc_turret")
                     ent.Delete();
             }
         }
@@ -4528,6 +5114,8 @@ namespace AIZombiesSupreme
                     players.SetField("allPerks", true);
                     hud.scoreMessage(players, AIZ.gameStrings[327]);
                 }
+
+                Entity.Level.SetField("allPerks", true);
             }
         }
         public static void dome_easterEggReward()
@@ -4546,6 +5134,17 @@ namespace AIZombiesSupreme
 
             Entity weapon = wallWeapon(weapCrate.Origin + new Vector3(15, 0, 10), weapCrate.Angles - new Vector3(0, 0, 90), "stinger_mp", 0);
             OnInterval(100, () => dome_watchEasterEggReward(weapon));
+
+            AIZ.currentZappers = 1;
+            string[] newWeaponModels = new string[weaponModels.Length + 1];
+            weaponModels.CopyTo(newWeaponModels, 0);
+            newWeaponModels[newWeaponModels.Length - 1] = "weapon_stinger";
+            string[] newWeaponNames = new string[weaponNames.Length + 1];
+            weaponNames.CopyTo(newWeaponNames, 0);
+            newWeaponNames[newWeaponNames.Length - 1] = "stinger_mp";
+            string[] newLocalizedWeaponNames = new string[localizedNames.Length + 1];
+            localizedNames.CopyTo(newLocalizedWeaponNames, 0);
+            newLocalizedWeaponNames[newLocalizedWeaponNames.Length - 1] = "^2Zapper";
         }
         private static bool dome_watchEasterEggReward(Entity weapon)
         {

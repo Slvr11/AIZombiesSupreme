@@ -39,7 +39,7 @@ namespace AIZombiesSupreme
         public static int maxPlayerHealth_Jugg = 251;
         public static bool powerActivated = false;
         public static bool tempPowerActivated = false;
-        public static readonly string version = "1.44";
+        public static readonly string version = "1.5";
         public static readonly string dev = "Slvr99";
 
         private static readonly int[] expectedDevResults = new int[100];//Set to 100 and generate results at runtime
@@ -54,6 +54,9 @@ namespace AIZombiesSupreme
         private static bool autoUpdate = true;
         private static bool allowServerGametypeHack = true;
         private static bool allowGametypeHack = true;
+        public static bool botDeathVoices = false;
+        public static bool fullFireSale = false;
+        public static float damageGracePeriod = 0.25f;
         private static readonly string pauseMenu = "class";
         public static string vision = "";
         public static readonly string bossVision = "cobra_sunset1";
@@ -65,6 +68,7 @@ namespace AIZombiesSupreme
         public static readonly byte maxRayguns = 2;
         public static byte currentThunderguns = 0;
         public static readonly byte maxThunderguns = 1;
+        public static byte currentZappers = 0;
 
         private static short fx_carePackage;
         public static short fx_rayGun;
@@ -104,7 +108,8 @@ namespace AIZombiesSupreme
         public static short fx_glow2;
         public static short fx_crateCollectSmoke;
         public static short fx_tankExplode;
-        public static short fx_flamethrower;
+        public static short fx_crawlerExplode;
+        //public static short fx_flamethrower;
 
         private static uint[] rankTable = new uint[81];
 
@@ -143,7 +148,7 @@ namespace AIZombiesSupreme
             //SetDvarIfUninitialized("aiz_blockThirdPartyScripts", 0);//Set this before checking if it doesn't exist
             //if (GetDvarInt("aiz_blockThirdPartyScripts") != 0)
             //{
-                //unloadThirdPartyScripts();
+            //unloadThirdPartyScripts();
             //}
 
             loadConfig();
@@ -351,7 +356,7 @@ namespace AIZombiesSupreme
             //Seasonal elements
             checkForSeasons();
 
-            mapEdit.cleanLevelEnts();
+            StartAsync(mapEdit.cleanLevelEnts());
             StartAsync(mapEdit.specialLevelFunctions());
 
             for (int i = 0; i < 30; i++)//init botPool. Can be changed to higher number of offhand bots
@@ -386,15 +391,17 @@ namespace AIZombiesSupreme
 
             //init voting map table
             int index = 0;
-            for (int i = 109; i < 145; i++)
+            for (int i = 109; i < 146; i++)
             {
                 if (index == 0) hud.mapNames[index++] = "-";
+                else if (i == 145) hud.mapNames[index++] = gameStrings[86];
                 else hud.mapNames[index++] = gameStrings[i];
             }
             index = 0;
-            for (int i = 144; i < 180; i++)
+            for (int i = 144; i < 181; i++)
             {
                 if (index == 0) hud.mapDesc[index++] = "-";
+                else if (i == 180) hud.mapDesc[index++] = gameStrings[87];
                 else hud.mapDesc[index++] = gameStrings[i];
             }
         }
@@ -444,6 +451,7 @@ namespace AIZombiesSupreme
             fx_glow2 = (short)LoadFX("props/glow_latern");
             fx_crateCollectSmoke = (short)LoadFX("props/crateexp_dust");
             //fx_flamethrower = (short)LoadFX("impacts/pipe_fire");
+            fx_crawlerExplode = (short)LoadFX("props/barrelExp");
 
             PreCacheModel(mapEdit.teddyModel);
             PreCacheModel(mapEdit.getAlliesFlagModel(_mapname));
@@ -475,29 +483,36 @@ namespace AIZombiesSupreme
             PreCacheShader("cardicon_skull_black");
             PreCacheHeadIcon("waypoint_revive");
             PreCacheStatusIcon("cardicon_iwlogo");
-            //killstreaks
-            if (_mapname != "mp_carbon" && _mapname != "mp_cement")
+            PreCacheMiniMapIcon("compassping_friendly_party_mp");//Bot compass
+
+            /*
+            for (int i = 0; i < 12; i++)
             {
-                PreCacheMpAnim(killstreaks.botAnim_idle);
-                PreCacheMpAnim(killstreaks.botAnim_idleRPG);
-                PreCacheMpAnim(killstreaks.botAnim_idleMG);
-                //PreCacheMpAnim(d_killstreaks.botAnim_idlePistol);
-                PreCacheMpAnim(killstreaks.botAnim_reload);
-                PreCacheMpAnim(killstreaks.botAnim_reloadRPG);
-                PreCacheMpAnim(killstreaks.botAnim_reloadPistol);
-                PreCacheMpAnim(killstreaks.botAnim_reloadMG);
-                PreCacheMpAnim(killstreaks.botAnim_run);
-                PreCacheMpAnim(killstreaks.botAnim_runMG);
-                PreCacheMpAnim(killstreaks.botAnim_runRPG);
-                PreCacheMpAnim(killstreaks.botAnim_runPistol);
-                PreCacheMpAnim(killstreaks.botAnim_runShotgun);
-                PreCacheMpAnim(killstreaks.botAnim_runSMG);
-                PreCacheMpAnim(killstreaks.botAnim_runSniper);
-                PreCacheMpAnim(killstreaks.botAnim_shoot);
-                PreCacheMpAnim(killstreaks.botAnim_shootMG);
-                PreCacheMpAnim(killstreaks.botAnim_shootPistol);
-                PreCacheMpAnim(killstreaks.botAnim_shootRPG);
+                string icon = killstreaks.getKillstreakCrateIcon(i);
+                PreCacheShader(icon);
             }
+            */
+            //killstreaks
+            PreCacheMpAnim(killstreaks.botAnim_idle);
+            //PreCacheMpAnim(killstreaks.botAnim_idleRPG);
+            PreCacheMpAnim(killstreaks.botAnim_idleMG);
+            //PreCacheMpAnim(d_killstreaks.botAnim_idlePistol);
+            PreCacheMpAnim(killstreaks.botAnim_reload);
+            //PreCacheMpAnim(killstreaks.botAnim_reloadRPG);
+            //PreCacheMpAnim(killstreaks.botAnim_reloadPistol);
+            PreCacheMpAnim(killstreaks.botAnim_reloadMG);
+            PreCacheMpAnim(killstreaks.botAnim_run);
+            PreCacheMpAnim(killstreaks.botAnim_runMG);
+            //PreCacheMpAnim(killstreaks.botAnim_runRPG);
+            //PreCacheMpAnim(killstreaks.botAnim_runPistol);
+            //PreCacheMpAnim(killstreaks.botAnim_runShotgun);
+            PreCacheMpAnim(killstreaks.botAnim_runSMG);
+            //PreCacheMpAnim(killstreaks.botAnim_runSniper);
+            PreCacheMpAnim(killstreaks.botAnim_shoot);
+            PreCacheMpAnim(killstreaks.botAnim_shootMG);
+            //PreCacheMpAnim(killstreaks.botAnim_shootPistol);
+            //PreCacheMpAnim(killstreaks.botAnim_shootRPG);
+
             PreCacheVehicle("remote_uav_mp");
             //botAnims
             PreCacheMpAnim(botUtil.anim_attack);
@@ -598,6 +613,7 @@ namespace AIZombiesSupreme
             player.SetField("weaponsList", new Parameter(new List<string>()));
             player.SetField("hasAlteredROF", false);
             player.SetField("deathCount", 0);
+            player.SetField("hasUsedBox", false);
 
             //Reset certain dvars that some servers may have set and not restored
             player.SetClientDvar("waypointIconHeight", "36");
@@ -827,7 +843,7 @@ namespace AIZombiesSupreme
             player.SetField("ownsExpAmmo", false);
             player.SetField("ownsMapStreak", false);
             player.SetField("hasExpAmmoPerk", false);
-            player.SetField("isInHeliSniper", false);
+            player.SetField("notTargetable", false);
 
             //hud.cs init
             if (!player.HasField("cash"))
@@ -837,7 +853,13 @@ namespace AIZombiesSupreme
             //player.SetField("hasMessageUp", false); 
 
             //All perks
-            if (player.HasField("allPerks") && player.GetField<bool>("allPerks")) bonusDrops.giveAllPerks(player);
+            if ((player.HasField("allPerks") && player.GetField<bool>("allPerks")) || (Entity.Level.HasField("allPerks") && Entity.Level.GetField<bool>("allPerks")))
+            {
+                bonusDrops.giveAllPerks(player);
+                //Give hand-gun to fill second slot for mule kick
+                player.GiveWeapon("defaultweapon_mp");
+                updatePlayerWeaponsList(player, "defaultweapon_mp");
+            }
 
             player.SetEMPJammed(false);
         }
@@ -898,14 +920,14 @@ namespace AIZombiesSupreme
 
             if (message == "toggleBotsIgnoreMe")
             {
-                if (player.GetField<bool>("isInHeliSniper"))
+                if (player.GetField<bool>("notTargetable"))
                 {
-                    player.SetField("isInHeliSniper", false);
+                    player.SetField("notTargetable", false);
                     IPrintLn(player.Name + " ^7notarget OFF");
                 }
-                else if (!player.GetField<bool>("isInHeliSniper"))
+                else if (!player.GetField<bool>("notTargetable"))
                 {
-                    player.SetField("isInHeliSniper", true);
+                    player.SetField("notTargetable", true);
                     IPrintLn(player.Name + " ^7notarget ON");
                 }
 
@@ -1317,11 +1339,13 @@ namespace AIZombiesSupreme
                         continue;
                     }
 
+                    /*
                     if (players.GetField<bool>("ownsBot") && !isSpecialWeapon(weapon))
                     {
                         Entity bot = players.GetField<Entity>("bot");
                         killstreaks.updateBotGun(bot);
                     }
+                    */
 
                     if ((trimWeaponScope(weapon) == "iw5_type95_mp_reflex_xmags_camo11" || trimWeaponScope(weapon) == "iw5_m16_mp_rof_xmags_camo11"))
                     {
@@ -1740,6 +1764,7 @@ namespace AIZombiesSupreme
                 //StartAsync(runRaygun(fx, player, time, hitPos, fxName, damage));
                 runRaygun_entCheck(fx, player, time, hitPos, fxName, damage);
             }
+            /*
             else if (weapon == "iw5_pp90m1_mp_silencer_xmags_camo10")
             {
                 Vector3 origin = player.GetTagOrigin("tag_weapon_left");
@@ -1749,6 +1774,7 @@ namespace AIZombiesSupreme
                 Entity flameFX = PlayFX_Ret(fx_flamethrower, origin, forward, up);
                 AfterDelay(50, () => flameFX.Delete());
             }
+            */
 
             if (isRayGun(weapon))
                 player.PlaySound("whizby_far_00_L");
@@ -2112,6 +2138,15 @@ namespace AIZombiesSupreme
             return false;
         }
 
+        public static IEnumerator reviveGracePeriod(Entity player)
+        {
+            player.SetField("notTargetable ", true);
+
+            yield return Wait(1);
+
+            player.SetField("notTargetable ", false);
+        }
+
         private static void onPlayerDeath(Entity player)
         {
             if (player.HasField("bot") && player.GetField<Entity>("bot").GetField<string>("state") != "dead") StartAsync(killstreaks.killPlayerBot(player));
@@ -2232,7 +2267,6 @@ namespace AIZombiesSupreme
                 using (StreamWriter newCfg = new StreamWriter("scripts\\aizombies\\config.cfg"))
                 {
                     newCfg.WriteLine("//AIZombies Supreme v{0} Config File//", version);
-                    //newCfg.WriteLine("Waves: {0} //The max amount of waves to play in a game.", roundSystem.totalWaves);
                     newCfg.WriteLine("Game Language: {0} //The language that AIZombies will be in. Valid languages are 'english', 'spanish', 'french', 'german', 'croation', and 'serbian'.", gameLanguage);
                     newCfg.WriteLine("Spawn Weapon System: {0} //The type of weapon spawn. Valid options are 'Normal' and 'Random'.", spawnType == 1 ? "Random" : "Normal");
                     newCfg.WriteLine("Max Health: {0} //The normal max player health.", maxPlayerHealth);
@@ -2245,8 +2279,10 @@ namespace AIZombiesSupreme
                     newCfg.WriteLine("Perk Drops: {0} //Allow perk bonus drops at the end of crawler rounds on hell maps", botUtil.perkDropsEnabled ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Map Voting: {0} //Enable or disable voting for the next map after a game has ended.", voting ? "Enabled" : "Disabled");
                     newCfg.WriteLine("DLC Maps: {0} //Enable or disable dlc maps in map voting.", dlcEnabled ? "Enabled" : "Disabled");
-                    //newCfg.WriteLine("Alternate Weapon Names: {0} //Use alternate names for upgraded weapons.", altWeaponNames ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Perk Limit: {0} //The max amount of perks a player can buy. 0 is no limit.", perkLimit);
+                    newCfg.WriteLine("Zombie Death Voices: {0} //Enable or disable death voices when an AI zombie dies.", botDeathVoices ? "Enabled" : "Disabled");
+                    newCfg.WriteLine("Full Fire Sale: {0} //Enable or disable if fire sale powerups should spawn all weapon boxes when collected.", fullFireSale ? "Enabled" : "Disabled");
+                    newCfg.WriteLine("Damage Grace Period: {0} //How long to wait before a player can be attacked after already being attacked.", damageGracePeriod);
                     newCfg.WriteLine("Auto Updates: {0} //Enable or disable auto updates for AIZombies", autoUpdate ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Custom Server Gametype: {0} //Enable or disable the server displaying 'AIZombies' as the gametype in the server browser. Disable this if you experience crashing on startup.", allowServerGametypeHack ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Custom Gametype: {0} //Enable or disable the server displaying 'AIZombies Supreme' as the gametype in-game. Disable this if you experience frequent crashes.", allowGametypeHack ? "Enabled" : "Disabled");
@@ -2279,21 +2315,22 @@ namespace AIZombiesSupreme
                 using (StreamWriter newCfg = new StreamWriter("scripts\\aizombies\\config.cfg", false))
                 {
                     newCfg.WriteLine("//AIZombies Supreme v{0} Config File//", version);
-                    //newCfg.WriteLine("Waves: {0} //The max amount of waves to play in a game.", roundSystem.totalWaves);
                     newCfg.WriteLine("Game Language: {0} //The language that AIZombies will be in. Valid laguages are 'english', 'spanish', 'french', 'german', 'croation', and 'serbian'.", gameLanguage);
                     newCfg.WriteLine("Spawn Weapon System: {0} //The type of weapon spawn. Valid options are 'Normal' and 'Random'.", spawnType == 1 ? "Random" : "Normal");
                     newCfg.WriteLine("Max Health: {0} //The normal max player health.", maxPlayerHealth);
                     newCfg.WriteLine("Max Juggernog Health: {0} //The max player health with juggernog.", maxPlayerHealth_Jugg);
-                    newCfg.WriteLine("Bot Starting Health: {0} //The starting health of a bot.", 100);//These next four values will be hardcoded for new config files to fix most server values. This should be reverted next update!
-                    newCfg.WriteLine("Crawler Health: {0} //The health of a crawler bot.", 110);
-                    newCfg.WriteLine("Boss Health: {0} //The health of a boss bot.", 2500);
-                    newCfg.WriteLine("Bot Health Factor: {0} //The amount of health to add to bots every round", 2);
+                    newCfg.WriteLine("Bot Starting Health: {0} //The starting health of a bot.", botUtil.health);
+                    newCfg.WriteLine("Crawler Health: {0} //The health of a crawler bot.", botUtil.crawlerHealth);
+                    newCfg.WriteLine("Boss Health: {0} //The health of a boss bot.", botUtil.bossHealth);
+                    newCfg.WriteLine("Bot Health Factor: {0} //The amount of health to add to bots every round", botUtil.healthScalar);
                     newCfg.WriteLine("Bot Damage: {0} //The amount of damage a bot does to a player", botUtil.dmg);
                     newCfg.WriteLine("Perk Drops: {0} //Allow perk bonus drops at the end of crawler rounds on hell maps", botUtil.perkDropsEnabled ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Map Voting: {0} //Enable or disable voting for the next map after a game has ended.", voting ? "Enabled" : "Disabled");
                     newCfg.WriteLine("DLC Maps: {0} //Enable or disable dlc maps in map voting.", dlcEnabled ? "Enabled" : "Disabled");
-                    //newCfg.WriteLine("Alternate Weapon Names: {0} //Use alternate names for upgraded weapons.", altWeaponNames ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Perk Limit: {0} //The max amount of perks a player can buy. 0 is no limit.", perkLimit);
+                    newCfg.WriteLine("Zombie Death Voices: {0} //Enable or disable death voices when an AI zombie dies.", botDeathVoices ? "Enabled" : "Disabled");
+                    newCfg.WriteLine("Full Fire Sale: {0} //Enable or disable if fire sale powerups should spawn all weapon boxes when collected.", fullFireSale ? "Enabled" : "Disabled");
+                    newCfg.WriteLine("Damage Grace Period: {0} //How long to wait before a player can be attacked after already being attacked.", damageGracePeriod);
                     newCfg.WriteLine("Auto Updates: {0} //Enable or disable auto updates for AIZombies", autoUpdate ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Custom Server Gametype: {0} //Enable or disable the server displaying 'AIZombies' as the gametype in the server browser. Disable this if you experience crashing on startup.", allowServerGametypeHack ? "Enabled" : "Disabled");
                     newCfg.WriteLine("Custom Gametype: {0} //Enable or disable the server displaying 'AIZombies Supreme' as the gametype in-game. Disable this if you experience frequent crashes.", allowGametypeHack ? "Enabled" : "Disabled");
@@ -2373,6 +2410,12 @@ namespace AIZombiesSupreme
                         perkLimit = setB;
                     else printToConsole(gameStrings[35], perkLimit);
                     break;
+                case "zombiedeathvoices":
+                    botDeathVoices = isValueEnabled(value);
+                    break;
+                case "fullfiresale":
+                    fullFireSale = isValueEnabled(value);
+                    break;
                 case "autoupdates":
                         autoUpdate = isValueEnabled(value);
                     break;
@@ -2384,6 +2427,12 @@ namespace AIZombiesSupreme
                     break;
                 case "gamelanguage":
                     gameLanguage = value.ToLower();
+                    break;
+                case "damagegraceperiod":
+                    float gracePeriod;
+                    if (float.TryParse(value, out gracePeriod))
+                        damageGracePeriod = gracePeriod;
+                    //else printToConsole(gameStrings[80], damageGracePeriod);
                     break;
             }
         }
@@ -4309,14 +4358,14 @@ namespace AIZombiesSupreme
                     strings[77] = "Gametype pretraživanje imena j otkazano iz nepoznatih razloga.";
                     strings[78] = "Došlo je do greške prilikom postavljanja gametype imena!: ";
                     strings[79] = "Došlo je do greške prilikom podešavanja gametype imena : Adresa nije pronaðena!";
-                    strings[80] = "Podešavanje gameInfo[{0}] na {1}";
+                    strings[80] = "Pritisnite ^3[{+activate}] ^7da pokupite Sentry Gun";
                     strings[81] = "Traženje oružja je dovršeno.";
                     strings[82] = "Potraga za oružjem je otkazana iz nepoznatih razloga! To može dovesti fo toga da se pojave bagovi za odreðena oružja.";
                     strings[83] = "Došlo je do greške pronalaženja oružja patch lokacije: ";
                     strings[84] = "Nije moguæe postaviti prilagoðeno ime u pregledaèu servera!";
                     strings[85] = "Nije bilo moguæe pronaæi podatke o oružju za {0}! Molim vas prijavite ovu grešku Slvr99";
-                    strings[86] = "";
-                    strings[87] = "Pisanje patches za ";
+                    strings[86] = "Boardwalk";
+                    strings[87] = "Sajam na plaži koji su prekinuli nemrtvi";
                     strings[88] = "Nije moguæe postaviti prilagoðeno gametype ime.";
                     strings[89] = "Nije moguæe vratiti u prethodno stanje prilagoðenu nisku režima za igru! Ovo može prouzrokovati pad servera kada se mapa promeni!";
                     strings[90] = "Sve skripte treæeg lica su uèitane sa ovog servera zbog konflikta sa AIZombies.";
@@ -4654,14 +4703,14 @@ namespace AIZombiesSupreme
                     strings[77] = "La búsqueda de nombres de tipo de juego fue cancelada por una razón desconocida.";
                     strings[78] = "¡Hubo un error al establecer el nombre del tipo de juego !:";
                     strings[79] = "Se produjo un error al configurar el nombre del tipo de juego: ¡No se encontraron direcciones!";
-                    strings[80] = "";
+                    strings[80] = "Presiona ^3[{+activate}] ^7para recoger la pistola centinela";
                     strings[81] = "";
                     strings[82] = "La búsqueda de parche de arma fue cancelada por una razón desconocida! Esto puede causar errores para ciertas armas.";
                     strings[83] = "Hubo un error al encontrar ubicaciones de parches de armas:";
                     strings[84] = "No se puede establecer un nombre de gametype personalizado en el navegador del servidor!";
                     strings[85] = "¡No se pudieron encontrar datos de armas para {0}! Por favor, informe este error a Slvr99";
-                    strings[86] = "";
-                    strings[87] = "";
+                    strings[86] = "Boardwalk";
+                    strings[87] = "Una feria playera interrumpida por los muertos vivientes";
                     strings[88] = "No se puede establecer un nombre de gametype personalizado.";
                     strings[89] = "No se puede restaurar la cadena de modo de juego personalizado! ¡Esto puede resultar en una falla del servidor cuando el mapa cambia!";
                     strings[90] = "Todos los scripts de terceros se han descargado de este servidor debido a un conflicto con AIZombies.";
@@ -4999,14 +5048,14 @@ namespace AIZombiesSupreme
                     strings[77] = "La recherche du nom du type de jeu a été annulée pour une raison inconnue.";
                     strings[78] = "Une erreur s'est produite lors de la définition du nom du type de jeu!:";
                     strings[79] = "Une erreur s'est produite lors de la définition du nom du type de jeu: Aucune adresse trouvée!";
-                    strings[80] = "";
+                    strings[80] = "Appuyez sur ^3[{+activate}] ^7pour récupérer la mitrailleuse.";
                     strings[81] = "";
                     strings[82] = "La recherche de patch d'armes a été annulée pour une raison inconnue! Cela peut causer des bugs pour certaines armes.";
                     strings[83] = "Une erreur s'est produite lors de la recherche de l'emplacement des correctifs d'arme:";
                     strings[84] = "Impossible de définir un nom de type de jeu personnalisé dans le navigateur du serveur!";
                     strings[85] = "Impossible de trouver les données d'arme pour {0}! Veuillez signaler cette erreur à Slvr99";
-                    strings[86] = "";
-                    strings[87] = "";
+                    strings[86] = "Boardwalk";
+                    strings[87] = "Une foire en bord de mer interrompue par les morts-vivants";
                     strings[88] = "Impossible de définir un nom de type de jeu personnalisé.";
                     strings[89] = "Impossible de restaurer la chaîne de mode de jeu personnalisée! Cela peut entraîner un crash du serveur lorsque la carte change!";
                     strings[90] = "Tous les scripts tiers ont été déchargés de ce serveur en raison d'un conflit avec AIZombies.";
@@ -5344,14 +5393,14 @@ namespace AIZombiesSupreme
                     strings[77] = "Die Suche nach Gametyp-Namen wurde aus einem unbekannten Grund abgebrochen.";
                     strings[78] = "Beim Festlegen des Gametypnamens ist ein Fehler aufgetreten:";
                     strings[79] = "Beim Festlegen des Gametypnamens ist ein Fehler aufgetreten: Keine Adressen gefunden!";
-                    strings[80] = "";
+                    strings[80] = "Drücken Sie ^3[{+activate}]^7 um die Sentry Gun aufzunehmen";
                     strings[81] = "";
                     strings[82] = "Die Suche nach Waffen-Patches wurde aus einem unbekannten Grund abgebrochen! Dies kann zu Fehlern bei bestimmten Waffen führen.";
                     strings[83] = "Es ist ein Fehler bei der Suche nach Positionen von Waffen-Patches aufgetreten";
                     strings[84] = "Der Name des benutzerdefinierten Gametyps kann nicht im Server-Browser festgelegt werden!";
                     strings[85] = "Waffendaten für {0} konnten nicht gefunden werden! Bitte melden Sie diesen Fehler an Slvr99";
-                    strings[86] = "";
-                    strings[87] = "";
+                    strings[86] = "Boardwalk";
+                    strings[87] = "Ein Jahrmarkt am Strand, unterbrochen von den Untoten";
                     strings[88] = "Der Name des benutzerdefinierten Gametyps kann nicht festgelegt werden.";
                     strings[89] = "Die benutzerdefinierte Gamemode-Zeichenfolge kann nicht wiederhergestellt werden! Dies kann zu einem Serverabsturz führen, wenn sich die Karte ändert.";
                     strings[90] = "Alle Skripte von Drittanbietern wurden aufgrund eines Konflikts mit AIZombies von diesem Server entladen.";
@@ -5690,14 +5739,14 @@ namespace AIZombiesSupreme
                 strings[77] = "Поиск по названию игрового типа был отменен по неизвестной причине.";
                 strings[78] = "При установке имени типа игры произошла ошибка !:";
                 strings[79] = "При установке имени типа игры произошла ошибка: адреса не найдены!";
-                strings[80] = "";
+                strings[80] = "Нажмите ^3[{+активировать}]^7 чтобы взять турель.";
                 strings[81] = "";
                 strings[82] = "Поиск патча оружия был отменен по неизвестной причине! Это может привести к появлению ошибок для определенного оружия.";
                 strings[83] = "При поиске мест для патчей оружия произошла ошибка:";
                 strings[84] = "Невозможно установить имя пользовательского типа игры в браузере сервера!";
                 strings[85] = "Не удалось найти данные об оружии для {0}! Пожалуйста, сообщите об этой ошибке Slvr99";
-                strings[86] = "";
-                strings[87] = "";
+                strings[86] = "Boardwalk";
+                strings[87] = "Пляжная ярмарка, прерванная нежитью";
                 strings[88] = "Невозможно установить название пользовательского игрового типа.";
                 strings[89] = "Невозможно восстановить пользовательскую строку игрового режима! Это может привести к сбою сервера при изменении карты!";
                 strings[90] = "Все сторонние скрипты были выгружены с этого сервера из-за конфликта с AIZombies.";
@@ -6037,14 +6086,14 @@ namespace AIZombiesSupreme
                     strings[77] = "Gametype name search was cancelled for an unknown reason.";
                     strings[78] = "There was an error setting the gametype name!: ";
                     strings[79] = "There was an error setting the gametype name: No addresses found!";
-                    strings[80] = "";
+                    strings[80] = "Press ^3[{+activate}] ^7to pick up the Sentry Gun";
                     strings[81] = "";
                     strings[82] = "Weapon patch search was cancelled for an unknown reason! This may cause bugs to occur for certain weapons.";
                     strings[83] = "There was an error finding weapon patch locations: ";
                     strings[84] = "Unable to set custom gametype name in server browser!";
                     strings[85] = "Could not find weapon data for {0}! Please report this error to Slvr99";
-                    strings[86] = "";
-                    strings[87] = "";
+                    strings[86] = "Boardwalk";
+                    strings[87] = "A beachside fair interrupted by the undead";
                     strings[88] = "Unable to set custom gametype name.";
                     strings[89] = "Unable to restore the custom gamemode string! This may result in a server crash when the map changes!";
                     strings[90] = "All third party scripts have been unloaded from this server due to a conflict with AIZombies.";

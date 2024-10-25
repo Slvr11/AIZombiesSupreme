@@ -101,6 +101,8 @@ namespace AIZombiesSupreme
             hitbox.SetCanDamage(false);
             hitbox.SetCanRadiusDamage(false);
             hitbox.SetModel("tag_origin");//Change model to avoid the dead bot's hitbox blocking shots
+            if (hitbox.HasField("headHitbox"))
+                bot.GetField<Entity>("headHitbox").SetModel("tag_origin");//Change head model as well
             bot.MoveTo(bot.Origin, 0.05f);
 
             bool isCrawler = !bot.HasField("head");
@@ -130,6 +132,9 @@ namespace AIZombiesSupreme
 
         private static void despawnBot(Entity bot, bool isCrawler, bool isBoss)
         {
+            if (isCrawler)
+                PlayFX(AIZ.fx_crawlerExplode, bot.Origin);
+
             bot.Hide();
             if (bot.HasField("head"))
             {
@@ -370,6 +375,8 @@ namespace AIZombiesSupreme
                 hitbox.SetCanDamage(false);
                 hitbox.SetCanRadiusDamage(false);
                 hitbox.SetModel("tag_origin");//Change model to avoid the dead bot's hitbox blocking shots
+                if (hitbox.HasField("headHitbox"))
+                    currentBot.GetField<Entity>("headHitbox").SetModel("tag_origin");//Change head model as well
                 //if (isBoss) hitbox.Delete();
                 if (AIZ.isPlayer(player))
                 {
@@ -387,6 +394,9 @@ namespace AIZombiesSupreme
                             hud.scorePopup(player, pointGain);
                         }
                         AIZ.addRank(player, pointGain);
+
+                        if (AIZ.botDeathVoices && !isCrawler && (string)meansOfDeath != "MOD_BLEEDOUT" && (string)meansOfDeath != "MOD_HEADSHOT" && instaKillTime == 0)
+                            currentBot.PlaySound("generic_death_russian_" + AIZ.rng.Next(1, 9));
                     }
                     player.Kills++;
                     if (player.HasField("aizHud_created"))
@@ -493,7 +503,7 @@ namespace AIZombiesSupreme
 
             int hitDamage;
             if (AIZ.weaponIsUpgrade(weapon)) hitDamage = damage / 2;//Base upgraded damage
-            else if (AIZ.isHellMap) hitDamage = damage / 2;//Hellmap damage
+            else if (AIZ.isHellMap) hitDamage = damage / 4;//Hellmap damage
             else hitDamage = damage / (1 + ((int)roundSystem.Wave / 2));//Base damage
 
             if (MOD == "MOD_MELEE") hitDamage = damage / (((int)roundSystem.Wave + 1) / 2);//Melee damage
@@ -508,12 +518,12 @@ namespace AIZombiesSupreme
                 if (AIZ.isSniper(weapon) || weapon.Contains("iw5_dragunov_mp")) hitDamage = (damage *= 2);//Sniper damage
                 if (AIZ.isShotgun(weapon))
                 {
-                    hitDamage = (int)(hitDamage * 14f);//Shotgun multiplier
+                    hitDamage = (int)(hitDamage * 8f);//Shotgun multiplier
                     StartAsync(setBotImmunity(botHitbox));
                 }
 
                 if (weapon == "gl_mp") hitDamage = 10000;//GL
-                else if (weapon == "iw5_xm25_mp") hitDamage = damage;
+                else if (weapon == "iw5_xm25_mp" || weapon == "m320_mp") hitDamage = Math.Max(damage - ((int)roundSystem.Wave * 3), 15);
                 else if (weapon == "xm25_mp") hitDamage = damage * 2;
                 else if (weapon == "iw5_mk14_mp") hitDamage *= 2;
                 else if (weapon.StartsWith("iw5_mk14_mp_reflex_xmags_camo11")) hitDamage *= 3;
@@ -525,7 +535,7 @@ namespace AIZombiesSupreme
 
             if (MOD == "MOD_HEADSHOT") hitDamage *= 3;
 
-            else if (MOD == "MOD_PASSTHRU") hitDamage = damage;//Script usage
+            else if (MOD == "MOD_PASSTHRU" || MOD == "MOD_BLEEDOUT") hitDamage = damage;//Script usage
 
             else if ((MOD == "MOD_EXPLOSIVE" || MOD == "MOD_GRENADE_SPLASH") && botHitbox.GetField<int>("damageTaken") >= botHitbox.GetField<int>("currentHealth") * 0.7f && botHitbox.GetField<Entity>("parent").HasField("head"))
                 botToCrawler(botHitbox);
@@ -590,7 +600,7 @@ namespace AIZombiesSupreme
             Entity bot = botHitbox.GetField<Entity>("parent");
             if (!bot.HasField("isAlive") || !bot.GetField<bool>("isAlive")) return false;//Check before we register the hit
 
-            onBotDamage(botHitbox, 20, player, Vector3.Zero, Vector3.Zero, "MOD_BLEEDOUT", "", "head", "j_head", 0, "", false, false);
+            onBotDamage(botHitbox, 5, player, Vector3.Zero, Vector3.Zero, "MOD_BLEEDOUT", "", "head", "j_head", 0, "", false, false);
 
             return true;
         }

@@ -4,6 +4,7 @@ using System.Text;
 using System.Collections.Generic;
 using InfinityScript;
 using static InfinityScript.GSCFunctions;
+using System.Reflection;
 
 namespace AIZombiesSupreme
 {
@@ -31,13 +32,13 @@ namespace AIZombiesSupreme
         private static string[] unlocalizedConfigStrings = new string[297];
         public static int currentUnlocalizedConfigStrings = 0;
         //Voting
-        private static readonly string[] mapList = new string[36]{"-", "mp_alpha", "mp_bootleg", "mp_bravo", "mp_carbon", "mp_dome"
+        private static readonly string[] mapList = new string[37]{"-", "mp_alpha", "mp_bootleg", "mp_bravo", "mp_carbon", "mp_dome"
         , "mp_exchange", "mp_hardhat", "mp_interchange", "mp_lambeth", "mp_mogadishu", "mp_paris", "mp_plaza2",
         "mp_radar", "mp_seatown", "mp_underground", "mp_village", "mp_italy", "mp_park", "mp_morningwood", "mp_overwatch", "mp_aground_ss",
         "mp_courtyard_ss", "mp_cement", "mp_hillside_ss", "mp_meteora", "mp_qadeem", "mp_restrepo_ss", "mp_terminal_cls", "mp_crosswalk_ss",
-        "mp_six_ss", "mp_burn_ss", "mp_shipbreaker", "mp_roughneck", "mp_nola", "mp_moab"};
-        public static readonly string[] mapNames = new string[36];
-        public static readonly string[] mapDesc = new string[36];
+        "mp_six_ss", "mp_burn_ss", "mp_shipbreaker", "mp_roughneck", "mp_nola", "mp_moab", "mp_boardwalk"};
+        public static readonly string[] mapNames = new string[37];
+        public static readonly string[] mapDesc = new string[37];
         //private static int mapSelection = 0;
         private static byte[] mapVotes = new byte[3]{0, 0, 0};
         private static byte[] mapLists = new byte[3]{0, 0, 0};
@@ -249,7 +250,7 @@ namespace AIZombiesSupreme
             HudElem scoreLine = HudElem.CreateIcon(player, "line_horizontal", 192, 2);
             scoreLine.SetPoint("BOTTOMCENTER", "BOTTOMCENTER", 0, -76);
             scoreLine.HideWhenInMenu = true;
-            scoreLine.Archived = true;
+            scoreLine.Archived = false;
             scoreLine.Alpha = 0;
             scoreLine.Sort = 15;
 
@@ -638,6 +639,13 @@ namespace AIZombiesSupreme
                 ammoClip.Alpha = 0;
                 //ammoSlash.Alpha = 0;
                 _setText(ammoSlash, " \n      " + grenade + special);
+                /*
+                if (player.HasField("hud_ammoClipAkimbo"))
+                {
+                    player.GetField<HudElem>("hud_ammoClipAkimbo").Destroy();
+                    player.ClearField("hud_ammoClipAkimbo");
+                }
+                */
             }
             else
             {
@@ -662,6 +670,29 @@ namespace AIZombiesSupreme
                 ammoClip.Alpha = 1;
                 //ammoSlash.Alpha = 1;
                 _setText(ammoSlash, "/\n      " + grenade + special);
+
+                /*
+                if (weapon.Contains("akimbo"))
+                {
+                    var functionsClass = typeof(BaseScript).GetNestedType("Functions", BindingFlags.Instance | BindingFlags.NonPublic);
+                    int leftAmmo = player.GetWeaponAmmoClip(weapon, "left");
+                    if (!player.HasField("hud_ammoClipAkimbo"))
+                    {
+                        HudElem ammoClipAkimbo = HudElem.CreateFontString(player, HudElem.Fonts.HudBig, 1);
+                        ammoClipAkimbo.Parent = ammoSlash;
+                        ammoClipAkimbo.SetPoint("RIGHT", "RIGHT", -35, -4);
+                        ammoClipAkimbo.HideWhenInMenu = true;
+                        ammoClipAkimbo.HideWhenDead = true;
+                        ammoClipAkimbo.Archived = false;
+                        ammoClipAkimbo.SetValue(leftAmmo);
+                        ammoClipAkimbo.Sort = 0;
+                        ammoClipAkimbo.Alpha = 1;
+                        player.SetField("hud_ammoClipAkimbo", ammoClipAkimbo);
+                    }
+
+                    player.GetField<HudElem>("hud_ammoClipAkimbo").SetValue(leftAmmo);
+                }
+                */
             }
 
             if (updateName) StartAsync(updateWeaponName(player, weapon));
@@ -849,7 +880,7 @@ namespace AIZombiesSupreme
                 case "iw5_m60_mp":
                     return "M60E4";
                 case "iw5_m60_mp_reflexlmg_xmags_camo11":
-                    return "^2Manhandler120";
+                    return "^1Manhandler120";
                 case "iw5_m60jugg_mp_eotechlmg_camo07":
                     return "^2AUG HBAR";
                 case "iw5_m60jugg_mp_silencer_thermal_camo08":
@@ -1048,7 +1079,7 @@ namespace AIZombiesSupreme
             Desc.SetPoint("CENTER", "CENTER", 0, -100);
             Desc.Color = new Vector3(0.99f, 1, 0.8f);
             Desc.HideWhenInMenu = true;
-            Desc.Archived = true;
+            Desc.Archived = false;
             Desc.Alpha = 0;
             HudElem PerkName = HudElem.CreateFontString(player, HudElem.Fonts.HudSmall, 1.7f);
             _setText(PerkName, Name);
@@ -1056,7 +1087,7 @@ namespace AIZombiesSupreme
             PerkName.SetPoint("CENTER", "CENTER", 0, -170);
             PerkName.Color = new Vector3(0.99f, 1, 0.8f);
             PerkName.HideWhenInMenu = true;
-            PerkName.Archived = true;
+            PerkName.Archived = false;
             PerkName.Alpha = 0;
             HudElem Image = NewClientHudElem(player);
             Image.SetShader(ImageName, 50, 50);
@@ -1115,7 +1146,7 @@ namespace AIZombiesSupreme
             roundStart.GlowAlpha = 0.7f;
             roundStart.GlowColor = new Vector3(0, 0, 1);
             roundStart.Alpha = 0;
-            roundStart.Archived = true;
+            roundStart.Archived = false;
             _setText(roundStart, AIZ.gameStrings[188] + roundSystem.Wave);
             roundStart.FadeOverTime(1);
             roundStart.Alpha = 1;
@@ -1798,7 +1829,7 @@ namespace AIZombiesSupreme
             _setText(title, AIZ.gameStrings[213]);
 
             //Determine maps
-            int maxMapsCount = 36;
+            int maxMapsCount = mapList.Length;
             if (!AIZ.dlcEnabled) maxMapsCount = 17;
 
             mapLists[0] = (byte)AIZ.rng.Next(1, maxMapsCount);
@@ -2092,7 +2123,7 @@ namespace AIZombiesSupreme
             intermission.VertAlign = HudElem.VertAlignments.Top_Adjustable;
             intermission.Foreground = true;
             intermission.Alpha = 0;
-            intermission.Archived = true;
+            intermission.Archived = false;
             intermission.HideWhenInMenu = true;
             intermission.Color = new Vector3(0, .85f, .85f);
             intermission.GlowColor = new Vector3(0, .85f, .85f);
@@ -2108,8 +2139,19 @@ namespace AIZombiesSupreme
             HudElem icon = NewTeamHudElem("allies");
             icon.SetShader("waypoint_revive", 8, 8);
             icon.Alpha = .85f;
+            icon.Archived = false;
             icon.SetWaypoint(true, true);
             icon.SetTargetEnt(player);
+            return icon;
+        }
+        public static HudElem createCarePackageIcon(Entity target, string iconName)
+        {
+            HudElem icon = NewTeamHudElem("allies");
+            icon.SetShader(iconName, 8, 8);
+            icon.Alpha = .85f;
+            icon.Archived = false;
+            icon.SetWaypoint(true, false);
+            icon.SetTargetEnt(target);
             return icon;
         }
 
@@ -2128,6 +2170,7 @@ namespace AIZombiesSupreme
             icon.SetShader("waypoint_revive", perk.Width, perk.Height);
             icon.HideWhenInMenu = true;
             icon.Foreground = true;
+            icon.Archived = false;
             icon.Alpha = 0;
             return icon;
         }
@@ -2144,7 +2187,7 @@ namespace AIZombiesSupreme
             icon.VertAlign = HudElem.VertAlignments.Fullscreen;
             icon.SetShader("combathigh_overlay", 640, 480);
             icon.Sort = -10;
-            //icon.Archived = true;
+            icon.Archived = false;
             icon.HideWhenInMenu = false;
             icon.HideIn3rdPerson = true;
             icon.Foreground = true;
@@ -2161,6 +2204,7 @@ namespace AIZombiesSupreme
             progressBar.Shader = "progress_bar_fill";
             progressBar.SetShader("progress_bar_fill", 1, 9);
             progressBar.Alpha = 1;
+            progressBar.Archived = false;
             progressBar.SetPoint("center", "", 0, -61);
             progressBar.AlignX = HudElem.XAlignments.Left;
             progressBar.X = -60;
@@ -2171,6 +2215,7 @@ namespace AIZombiesSupreme
             progressBarBG.Sort = -3;
             progressBarBG.Color = new Vector3(0, 0, 0);
             progressBarBG.Alpha = .5f;
+            progressBarBG.Archived = false;
             //progressBarBG.Parent = progressBar;
             //progressBarBG.SetShader("progress_bar_bg", 124, 13);
             //progressBarBG.SetField("hidden", false);
